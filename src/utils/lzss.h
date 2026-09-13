@@ -27,6 +27,12 @@ extern "C"
     extern int LZSS_Expand(unsigned char *input_string, int srcSize,
                            unsigned char *output_string, int uncompSize);
 
+    // Bounded variant for standalone tools reading untrusted/truncated saves.
+    // Returns bytes consumed, or -1 for malformed input. Never reads an
+    // unwritten dictionary slot or writes beyond uncompSize.
+    extern int LZSS_ExpandChecked(const unsigned char *input_string, int srcSize,
+                                 unsigned char *output_string, int uncompSize);
+
 #ifdef INCLUDE_FILE_COMPRESSION
 
     extern unsigned long LZSS_CompressFile(FILE *input, BIT_FILE *output);

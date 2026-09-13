@@ -602,6 +602,58 @@ extern "C"
      * to the calling routine, for verification.
      */
 
+    int LZSS_ExpandChecked(const uchar *input, int sourceSize, uchar *output,
+                           int outputSize)
+    {
+        if (sourceSize < 0 or outputSize < 0 or
+            (sourceSize and not input) or (outputSize and not output))
+            return -1;
+        if (outputSize == 0)
+            return 0;
+        uchar window[WINDOW_SIZE] = {};
+        bool written[WINDOW_SIZE] = {};
+        int source = 0, target = 0, cursor = 1;
+        while (target < outputSize)
+        {
+            if (source >= sourceSize)
+                return -1;
+            const unsigned flags = input[source++];
+            for (unsigned bit = 1; bit < 256 and target < outputSize; bit <<= 1)
+            {
+                if (flags bitand bit)
+                {
+                    if (source >= sourceSize)
+                        return -1;
+                    const uchar value = input[source++];
+                    output[target++] = window[cursor] = value;
+                    written[cursor] = true;
+                    cursor = MOD_WINDOW(cursor + 1);
+                }
+                else
+                {
+                    if (sourceSize - source < 2)
+                        return -1;
+                    const unsigned first = input[source++];
+                    const unsigned position = ((first bitand 15) << 8) | input[source++];
+                    const int length = (first >> 4) + BREAK_EVEN + 1;
+                    if (length > outputSize - target)
+                        return -1;
+                    for (int i = 0; i < length; ++i)
+                    {
+                        const unsigned index = MOD_WINDOW(position + i);
+                        if (not written[index])
+                            return -1;
+                        const uchar value = window[index];
+                        output[target++] = window[cursor] = value;
+                        written[cursor] = true;
+                        cursor = MOD_WINDOW(cursor + 1);
+                    }
+                }
+            }
+        }
+        return source;
+    }
+
     //sfr: added the src size here, we cant read past it
     int LZSS_Expand(uchar *input_string, int srcSize, uchar *output_string,
                     int size)
