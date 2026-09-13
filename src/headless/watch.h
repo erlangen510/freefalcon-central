@@ -18,6 +18,8 @@ private:
     unsigned long long sequence = 0, requestedSteps = 0, consumedSteps = 0, frame = 0;
     int speed = 1;
     bool paused = true, stopping = false;
+    bool regionActive = false;
+    double regionX = 0, regionY = 0, regionRadius = 10;
     void command();
     void write(const char* name, const std::string& contents);
 };

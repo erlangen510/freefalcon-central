@@ -13,6 +13,7 @@
 #include "team.h"
 #include "campterr.h"
 #include "campwp.h"
+#include "tmap.h"
 #include "scenario.h"
 #include "boundary.h"
 #include "watch.h"
@@ -20,6 +21,7 @@
 #include <fstream>
 #include <thread>
 #include <map>
+#include <cmath>
 
 namespace {
 std::string id(VU_ID value) {
@@ -65,7 +67,7 @@ void CampaignWatch::write(const char* name, const std::string& contents) {
 
 void CampaignWatch::initialize(const char* scenario) {
     std::ostringstream out;
-    out << "{\"schema\":1,\"scenario\":" << text(scenario) << ",\"width\":" << Map_Max_X
+    out << "{\"schema\":2,\"capabilities\":{\"regional_3d\":true,\"native_detailed_combat\":false},\"scenario\":" << text(scenario) << ",\"width\":" << Map_Max_X
         << ",\"height\":" << Map_Max_Y << ",\"cell_km\":1,\"teams\":[";
     for (int i = 0; i < NUM_TEAMS; ++i) {
         if (i) out << ',';
@@ -109,6 +111,8 @@ void CampaignWatch::initialize(const char* scenario) {
             // stored offset is east, the second north (find.cpp grid mapping).
             float north = 0, east = 0, z = 0; o->GetFeatureOffset(f, &east, &north, &z);
             out << "{\"name\":" << (feature ? text(feature->Name, 20) : "\"Feature\"")
+                << ",\"class_id\":" << index
+                << ",\"heading_deg\":" << FeatureEntryDataTable[o->GetObjectiveClassData()->FirstFeature + f].Facing
                 << ",\"dx\":" << east * 0.0003048 << ",\"dy\":" << north * 0.0003048 << '}';
         }
         out << "]}";
@@ -123,6 +127,19 @@ void CampaignWatch::initialize(const char* scenario) {
             cells.push_back(static_cast<char>(int(GetCover(x, y)) | (int(GetRelief(x, y)) << 4)
                 | (GetRoad(x, y) ? 64 : 0) | (GetRail(x, y) ? 128 : 0)));
     write("terrain.bin", cells);
+    // This is minimum-enroute-altitude terrain, not the original detailed
+    // heightfield. Expose its provenance instead of claiming collision terrain.
+    std::string heights;
+    heights.reserve(static_cast<size_t>(Map_Max_X) * Map_Max_Y * 2);
+    for (int y = 0; y < Map_Max_Y; ++y) {
+        for (int x = 0; x < Map_Max_X; ++x) {
+            auto meters = static_cast<unsigned short>(max(0.0f, min(65535.0f,
+                TheMap.GetMEA(y * 3280.839895f, x * 3280.839895f) * 0.3048f)));
+            heights.push_back(static_cast<char>(meters & 255));
+            heights.push_back(static_cast<char>(meters >> 8));
+        }
+    }
+    write("elevation.bin", heights);
     last = heartbeat = Clock::now();
     publish();
 }
@@ -132,8 +149,22 @@ void CampaignWatch::command() {
     unsigned long long seq, steps;
     int rate, pause, stop;
     if (!(in >> seq >> rate >> pause >> steps >> stop) || seq <= sequence) return;
-    if ((rate != 1 && rate != 5 && rate != 20 && rate != 100) || pause < 0 || pause > 1 || stop < 0 || stop > 1 || steps < requestedSteps || steps - requestedSteps > 100) return;
+    if ((rate != 1 && rate != 5 && rate != 10 && rate != 20 && rate != 100) || pause < 0 || pause > 1 || stop < 0 || stop > 1 || steps < requestedSteps || steps - requestedSteps > 100) return;
+    bool active = regionActive;
+    double x = regionX, y = regionY, radius = regionRadius;
+    std::string extension;
+    if (in >> extension) {
+        int enabled;
+        if (extension != "region" || !(in >> enabled >> x >> y >> radius)) return;
+        if ((enabled != 0 && enabled != 1) || !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(radius)
+            || x < 0 || y < 0 || x >= Map_Max_X || y >= Map_Max_Y || radius < 2 || radius > 20) return;
+        std::string extra; if (in >> extra) return;
+        active = enabled != 0;
+    }
+    // Enforced by the server, including clients sending an old five-field command.
+    if (active && rate > 10) rate = 10;
     if (speed != rate || paused != bool(pause)) credit = 0;
+    regionActive = active; regionX = x; regionY = y; regionRadius = radius;
     sequence = seq; speed = rate; paused = pause != 0; requestedSteps = steps; stopping = stop != 0;
     heartbeat = Clock::now();
 }
@@ -159,9 +190,12 @@ bool CampaignWatch::waitForStep() {
 
 void CampaignWatch::publish(const char* status) {
     std::ostringstream out;
-    out << "{\"schema\":1,\"frame\":" << ++frame << ",\"status\":" << text(status)
+    out << "{\"schema\":2,\"frame\":" << ++frame << ",\"status\":" << text(status)
         << ",\"time_ms\":" << TheCampaign.CurrentTime << ",\"ack\":" << sequence
         << ",\"speed\":" << speed << ",\"paused\":" << (paused ? "true" : "false")
+        << ",\"region\":{\"active\":" << (regionActive ? "true" : "false")
+        << ",\"x\":" << regionX << ",\"y\":" << regionY << ",\"radius_km\":" << regionRadius
+        << ",\"combat_model\":\"aggregate\",\"native_detailed_status\":\"not_implemented\",\"projectiles_available\":false}"
         << ",\"combat_messages\":" << ff_headless::combat.engagements << ",\"reported_losses\":" << ff_headless::combat.losses << ",\"units\":[";
     bool comma = false;
     VuListIterator it(AllUnitList);
@@ -173,6 +207,8 @@ void CampaignWatch::publish(const char* status) {
         out << '{'; common(out, u);
         out << ",\"name\":" << text(name) << ",\"class\":" << text(u->GetUnitClassName(), 20)
             << ",\"kind\":" << text(kind) << ",\"domain\":" << int(u->GetDomain())
+            << ",\"altitude_m\":" << u->GetUnitAltitude() * 0.3048
+            << ",\"heading_deg\":" << u->GetUnitHeading() * 45
             << ",\"vehicles\":" << u->GetTotalVehicles() << ",\"supply\":" << u->GetUnitSupply()
             << ",\"morale\":" << u->GetUnitMorale() << ",\"orders\":" << u->GetUnitOrders()
             << ",\"mission\":" << int(u->GetUnitMission()) << ",\"destination\":[" << dx << ',' << dy << "],\"equipment\":[";

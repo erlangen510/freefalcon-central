@@ -78,6 +78,16 @@ target_link_options(ff-campaign PRIVATE /DEBUG /MAP /LTCG /OPT:REF /OPT:ICF)
 target_link_libraries(ff_campaign_engine PRIVATE ff_scenario)
 target_link_libraries(ff-campaign PRIVATE ff_campaign_engine)
 target_compile_definitions(ff-campaign PRIVATE FF_CAMPAIGN_ENGINE=1)
+option(FF_BUILD_NATIVE_DYNAMICS "Compile original missile dynamics for the detailed-engine port (not yet connected)" OFF)
+if(FF_BUILD_NATIVE_DYNAMICS)
+  add_library(ff_native_missile_dynamics STATIC
+    ${FF_ROOT}/sim/missile/accel.cpp ${FF_ROOT}/sim/missile/aero.cpp
+    ${FF_ROOT}/sim/missile/atmos.cpp ${FF_ROOT}/sim/missile/engine.cpp
+    ${FF_ROOT}/sim/missile/eom.cpp ${FF_ROOT}/sim/missile/fcs.cpp
+    ${FF_ROOT}/sim/missile/gains.cpp ${FF_ROOT}/sim/missile/pitch.cpp
+    ${FF_ROOT}/sim/missile/trig.cpp ${FF_ROOT}/sim/missile/yaw.cpp)
+  target_link_libraries(ff_native_missile_dynamics PRIVATE ff_headless_options)
+endif()
 option(FF_BUILD_DEBUG_RUNNER "Build the Windows crash investigation helper" OFF)
 if(FF_BUILD_DEBUG_RUNNER)
   add_executable(ff-debug-runner debug_runner.cpp)

@@ -116,3 +116,26 @@ Both `run` and `watch` hold an exclusive `.headless.lock` handle in the data roo
 to prevent competing history-file writers. The handle is released on process exit.
 Use separate data copies for concurrent campaigns. The parent workspace contains
 the Godot observer, launcher and real-data protocol/UI integration checks.
+
+### Regional observer (schema 2)
+
+Optional control suffix: `region <0|1> <east-grid> <north-grid> <radius-km>`.
+Coordinates must be finite and in bounds; radius is 2..20 km. An active region
+caps speed at 10x in the native host (10 is now a valid rate). Legacy five-field
+commands retain the current region and cannot bypass the cap. Explicit region 0
+leaves it. This currently selects an observer region, **not deaggregated combat**.
+
+Catalog capabilities advertise `regional_3d: true`, `native_detailed_combat: false`.
+Snapshots report region geometry, `combat_model: aggregate`,
+`native_detailed_status: not_implemented`, `projectiles_available: false`.
+The current headless detailed-transition guards remain active.
+
+The catalog adds feature class IDs and headings; unit state adds campaign altitude
+in meters and heading in degrees. `elevation.bin` is a grid-sized uint16 LE meter
+array sampled from native MEA. It is coarse observer elevation, not collision
+terrain. Consumers must not mistake expanded aggregate counts for native
+individual-object positions.
+
+`FF_BUILD_NATIVE_DYNAMICS=ON` compiles ten original missile dynamics sources into
+`ff_native_missile_dynamics`. This archive is preparation for the native detailed
+port; it is not linked into `ff-campaign` and is not an executable flight test.
