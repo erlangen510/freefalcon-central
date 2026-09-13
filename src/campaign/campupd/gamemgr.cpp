@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "stdhdr.h"
 #include "entity.h"
 #include "classtbl.h"
@@ -112,6 +115,10 @@ int GameManagerClass::NoMorePlayers(VuGameEntity* game)
 // (i.e: is there one or more players attached to this?)
 int GameManagerClass::CheckPlayerStatus(FalconEntity* entity)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GameManagerClass::CheckPlayerStatus");
+#else
+
     VuSessionsIterator sessionWalker(FalconLocalGame);
     FalconSessionEntity* session;
     int player = 0;
@@ -149,6 +156,8 @@ int GameManagerClass::CheckPlayerStatus(FalconEntity* entity)
     }
 
     return player;
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -157,6 +166,10 @@ int GameManagerClass::CheckPlayerStatus(FalconEntity* entity)
 
 void GameManagerClass::AnnounceEntry()
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GameManagerClass::AnnounceEntry");
+#else
+
     // Guard: the player entity is sometimes NULL on sim entry (a pre-existing intermittent --
     // GetPlayerEntity() not ready yet) -> playerEntity->Id() crashed on this=NULL (crash
     // VuEntity::Id line 155 <- AnnounceEntry). Skip the announce (it's for status in
@@ -180,6 +193,8 @@ void GameManagerClass::AnnounceEntry()
     msg->dataBlock.vehicleID = FalconLocalSession->GetAircraftNum();
     msg->dataBlock.state = PSM_STATE_ENTERED_SIM;
     FalconSendMessage(msg, TRUE);
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -188,6 +203,10 @@ void GameManagerClass::AnnounceEntry()
 
 void GameManagerClass::AnnounceExit()
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GameManagerClass::AnnounceExit");
+#else
+
     // Announce our exit to the other players
     FalconPlayerStatusMessage* msg =
         new FalconPlayerStatusMessage(FalconLocalSessionId, FalconLocalGame);
@@ -226,6 +245,8 @@ void GameManagerClass::AnnounceExit()
 
     FalconSendMessage(msg, TRUE);
     FalconLocalSession->SetFlyState(FLYSTATE_IN_UI);
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -235,6 +256,10 @@ void GameManagerClass::AnnounceExit()
 void GameManagerClass::AnnounceTransfer(SimBaseClass* oldObj,
                                         SimBaseClass* newObj)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GameManagerClass::AnnounceTransfer");
+#else
+
     // Announce our transfer of entities to the other players
     FalconPlayerStatusMessage* msg =
         new FalconPlayerStatusMessage(FalconLocalSessionId, FalconLocalGame);
@@ -257,6 +282,8 @@ void GameManagerClass::AnnounceTransfer(SimBaseClass* oldObj,
     msg->dataBlock.vehicleID = FalconLocalSession->GetAircraftNum();
     msg->dataBlock.state = PSM_STATE_TRANSFERED;
     FalconSendMessage(msg, TRUE);
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -336,6 +363,10 @@ SimMoverClass* GameManagerClass::FindPlayerVehicle(UnitClass* campEntity,
 SimMoverClass* GameManagerClass::AttachPlayerToVehicle(
     FalconSessionEntity* player, SimMoverClass* simEntity, int playerSlot)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AttachPlayerToVehicle");
+#else
+
     Unit campEntity;
 
     //simEntity->ChangeOwner(player->Id());
@@ -376,6 +407,8 @@ SimMoverClass* GameManagerClass::AttachPlayerToVehicle(
     gRebuildBubbleNow = TRUE;
 
     return simEntity;
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -385,6 +418,10 @@ SimMoverClass* GameManagerClass::AttachPlayerToVehicle(
 int GameManagerClass::DetachPlayerFromVehicle(FalconSessionEntity* player,
                                               SimMoverClass* simEntity)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GameManagerClass::DetachPlayerFromVehicle");
+#else
+
     Unit campEntity;
 
     if (simEntity)
@@ -417,6 +454,8 @@ int GameManagerClass::DetachPlayerFromVehicle(FalconSessionEntity* player,
     }
 
     return 1;
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -427,8 +466,14 @@ void GameManagerClass::ReassignPlayerVehicle(FalconSessionEntity* player,
                                              SimMoverClass* oldEntity,
                                              SimMoverClass* newEntity)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GameManagerClass::ReassignPlayerVehicle");
+#else
+
     DetachPlayerFromVehicle(player, oldEntity);
     AttachPlayerToVehicle(player, newEntity, player->GetPilotSlot());
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -437,6 +482,10 @@ void GameManagerClass::ReassignPlayerVehicle(FalconSessionEntity* player,
 
 void GameManagerClass::LockPlayer(FalconSessionEntity* player)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GameManagerClass::LockPlayer");
+#else
+
     SimMoverClass* simEntity = (SimMoverClass*)player->GetPlayerEntity();
 
     if (simEntity)
@@ -455,6 +504,8 @@ void GameManagerClass::LockPlayer(FalconSessionEntity* player)
     {
         MonoPrint("Not locking hounds - no sim entity\n");
     }
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -464,6 +515,10 @@ void GameManagerClass::LockPlayer(FalconSessionEntity* player)
 // The player is ready to go.. We're going to set our invulnerability countdown and release the aircraft from motion pause
 void GameManagerClass::ReleasePlayer(FalconSessionEntity* player)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GameManagerClass::ReleasePlayer");
+#else
+
     SimMoverClass* simEntity = (SimMoverClass*)player->GetPlayerEntity();
 
     ShiAssert(player not_eq FalconLocalSession or simEntity);
@@ -560,6 +615,8 @@ void GameManagerClass::ReleasePlayer(FalconSessionEntity* player)
 
         gRebuildBubbleNow = TRUE;
     }
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////

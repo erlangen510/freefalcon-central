@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "stdhdr.h"
 #include "dogfight.h"
 #include "initdata.h"
@@ -185,6 +188,10 @@ void MakeDogfightTopTen(int mode)
 
 void MakeTacEngScoreList()
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("MakeTacEngScoreList");
+#else
+
     _TCHAR tmpn[30];
     long tmps, score[NUM_TEAMS], tmpclr;
     short i, j, idx;
@@ -232,4 +239,6 @@ void MakeTacEngScoreList()
 
     for (i = 0; i < idx; i++)
         _stprintf(gScorePoints[i], "%1ld", score[i]);
+
+#endif
 }

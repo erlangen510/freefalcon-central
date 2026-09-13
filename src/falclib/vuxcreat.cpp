@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 /*
  * Machine Generated message creation function file.
  * NOTE: This file is read only. DO NOT ATTEMPT TO MODIFY IT BY HAND.
@@ -83,6 +86,10 @@
  */
 VuMessage* VuxCreateMessage(VU_MSG_TYPE type, VU_ID senderid, VU_ID target)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("network message deserialization: offline host only");
+#else
+
     VuMessage* retval = NULL;
 
 #ifdef F4_DEBUG_COMMS
@@ -559,4 +566,6 @@ VuMessage* VuxCreateMessage(VU_MSG_TYPE type, VU_ID senderid, VU_ID target)
     }
 
     return retval;
+
+#endif
 }

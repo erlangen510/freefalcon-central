@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 /*
  * Machine Generated source file for message "Missile Endgame".
  * NOTE: The functions here must be completed by hand.
@@ -57,6 +60,10 @@ FalconMissileEndMessage::~FalconMissileEndMessage(void)
 
 int FalconMissileEndMessage::Process(uchar autodisp)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("FalconMissileEndMessage::Process");
+#else
+
     // Your Code Goes Here
     // SimBaseClass *weapon;
     Tpoint pos, vec;
@@ -950,6 +957,8 @@ int FalconMissileEndMessage::Process(uchar autodisp)
 
 
     return TRUE;
+
+#endif
 }
 
 

@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 /*
  * Machine Generated source file for message "Campaign Weap Fire".
  * NOTE: The functions here must be completed by hand.
@@ -220,7 +223,11 @@ int FalconCampWeaponsFire::Process(uchar autodisp)
     if (shooter->IsAggregate())
     {
         // Send a radio chatter message to LOCAL MACHINE if shooter is a flight
-        if (shooter->IsFlight() and not SimDriver.InSim() and not(rand() % 20))
+        if (shooter->IsFlight() and
+#ifndef FF_HEADLESS
+            not SimDriver.InSim() and
+#endif
+            not(rand() % 20))
         {
             // Send the chatter message;
             FalconRadioChatterMessage *msg = new FalconRadioChatterMessage(
@@ -306,9 +313,14 @@ int FalconCampWeaponsFire::Process(uchar autodisp)
 
     // Apply the damage data
     losses = target->DecodeDamageData(data, (Unit)shooter, dtm);
+#ifdef FF_HEADLESS
+    ++ff_headless::combat.engagements;
+    if (losses > 0) ff_headless::combat.losses += losses;
+#endif
 
     // add some additional fire effects if losses were taken, the target is
     // a battalion and the target is in the sim lists
+#ifndef FF_HEADLESS
     if (losses and target->InSimLists() and OTWDriver.IsActive())
     {
         int i;
@@ -369,6 +381,7 @@ int FalconCampWeaponsFire::Process(uchar autodisp)
         }
     }
 
+#endif
     if (dtm)
         delete dtm;
 
@@ -609,6 +622,10 @@ SimBaseClass *GetSimTarget(CampEntity target, uchar targetId)
 void FireOnSimEntity(CampEntity shooter, CampEntity campTarg, short weapon[],
                      uchar shots[], uchar targetId)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("combat against detailed entity");
+#else
+
     SimBaseClass *simTarg;
     int i;
 
@@ -629,6 +646,8 @@ void FireOnSimEntity(CampEntity shooter, CampEntity campTarg, short weapon[],
 
         FireOnSimEntity(shooter, simTarg, weapon[0]);
     }
+
+#endif
 }
 
 /*
@@ -639,6 +658,10 @@ void FireOnSimEntity(CampEntity shooter, CampEntity campTarg, short weapon[],
  */
 void FireOnSimEntity(CampEntity shooter, SimBaseClass *simTarg, short weaponId)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("combat against detailed entity");
+#else
+
     WeaponClassDataType *wc;
     FalconMissileEndMessage *endMessage = NULL;
     FalconDamageMessage *damMessage = NULL;
@@ -785,6 +808,8 @@ void FireOnSimEntity(CampEntity shooter, SimBaseClass *simTarg, short weaponId)
         // MonoPrint( "Not Weapon Class for Camp Weapon Message\n" );
         return;
     }
+
+#endif
 }
 
 /*
@@ -864,6 +889,10 @@ FalconDamageMessage *GetSimDamageMessage(CampEntity shooter,
 void DoDistanceVisualEffects(CampEntity shooter, CampEntity target,
                              int weapon_id, int shots)
 {
+#ifdef FF_HEADLESS
+    return;
+#else
+
     Tpoint pos, tar, vec;
     int stype;
     float interval;
@@ -1123,12 +1152,18 @@ void DoDistanceVisualEffects(CampEntity shooter, CampEntity target,
         DrawableParticleSys::PS_AddParticleEx((SFX_DIST_GROUNDBURSTS + 1), &pos,
                                               &PSvec);
     }
+
+#endif
 }
 
 
 void DoShortDistanceVisualEffects(CampEntity shooter, CampEntity target,
                                   int weapon_id, int shots)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DoShortDistanceVisualEffects");
+#else
+
     WeaponClassDataType *wc;
     Falcon4EntityClassType *classPtr;
     FalconMissileEndMessage *endMessage;
@@ -1228,11 +1263,17 @@ void DoShortDistanceVisualEffects(CampEntity shooter, CampEntity target,
 
         FalconSendMessage(endMessage, FALSE);
     }
+
+#endif
 }
 
 
 void FireMissileAtSim(CampEntity shooter, SimBaseClass *simTarg, short weapId)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("FireMissileAtSim");
+#else
+
     MissileClass *theMissile;
     float dx, dy, dz, xydist;
     SimObjectType *tmpTargetPtr;
@@ -1378,5 +1419,7 @@ void FireMissileAtSim(CampEntity shooter, SimBaseClass *simTarg, short weapId)
     FalconSendMessage( trackMsg );
     }
      */
+#endif
+
 #endif
 }

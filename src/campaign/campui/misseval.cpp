@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -794,6 +797,10 @@ void MissionEvaluationClass::RecordTargetStatus(FlightDataClass *flight_ptr,
 
 void MissionEvaluationClass::ServerFileLog(FalconPlayerStatusMessage *fpsm)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("MissionEvaluationClass::ServerFileLog");
+#else
+
     if (not g_bLogEvents)
         return;
 
@@ -1119,11 +1126,17 @@ void MissionEvaluationClass::ServerFileLog(FalconPlayerStatusMessage *fpsm)
 
 
     fclose(fp);
+
+#endif
 }
 
 
 int MissionEvaluationClass::PostMissionEval(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("MissionEvaluationClass::PostMissionEval");
+#else
+
     int i;
     PilotDataClass *pilot_data;
     FlightDataClass *flight_ptr;
@@ -1424,6 +1437,8 @@ int MissionEvaluationClass::PostMissionEval(void)
     CampLeaveCriticalSection();
 
     return 0;
+
+#endif
 }
 
 int MissionEvaluationClass::MissionSuccess(FlightDataClass *flight_ptr)
@@ -5417,6 +5432,10 @@ int ScoreDogfight(score_type type, int index)
 
 int ScoreInstantAction(score_type type, int index)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ScoreInstantAction");
+#else
+
     switch (type)
     {
     case SCORE_FIRE_WEAPON:
@@ -5452,6 +5471,8 @@ int ScoreInstantAction(score_type type, int index)
     }
 
     return 1;
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////

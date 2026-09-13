@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "falclib.h"
 #include "falcsess.h"
 #include "falcmesg.h"
@@ -827,6 +830,10 @@ int FalconEvent::Encode(VU_BYTE** buf)
 
 int FalconEvent::Activate(VuEntity* theEntity)
 {
+#ifdef FF_HEADLESS
+    return VuMessage::Activate(theEntity);
+#else
+
     unsigned char* buffer;
     unsigned char* savePos;
     EventIdData idData;
@@ -848,6 +855,8 @@ int FalconEvent::Activate(VuEntity* theEntity)
     }
 
     return 0;
+
+#endif
 }
 
 // ====================================

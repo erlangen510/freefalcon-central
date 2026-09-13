@@ -44,11 +44,19 @@ FalconSessionEntity::FalconSessionEntity(ulong domainMask, char* callsign)
 {
     //name = new _TCHAR[_NAME_LEN_];
     //_stprintf(name,"Kevin");
+    #ifdef FF_HEADLESS
+    strcpy(name, "Headless");
+#else
     _stprintf(name, LogBook.NameWRank());
+#endif
     name[_NAME_LEN_] = 0;
     //callSign = new _TCHAR[_CALLSIGN_LEN_];
     //_stprintf(callSign,"DeathPup");
+    #ifdef FF_HEADLESS
+    strcpy(callSign, "Headless");
+#else
     _stprintf(callSign, LogBook.Callsign());
+#endif
     callSign[_CALLSIGN_LEN_] = 0;
     playerSquadron = FalconNullId;
     playerFlight = FalconNullId;
@@ -57,8 +65,12 @@ FalconSessionEntity::FalconSessionEntity(ulong domainMask, char* callsign)
     //playerEntityPtr = NULL;
     //playerSquadronPtr = NULL;
     //playerFlightPtr = NULL;
+    #ifdef FF_HEADLESS
+    AceFactor = 1.0f;
+#else
     AceFactor = LogBook.AceFactor();
-    initAceFactor = LogBook.AceFactor();
+#endif
+    initAceFactor = AceFactor;
     memset(kills, 0, sizeof(kills));
     rating = 0;
     voiceID = 0;

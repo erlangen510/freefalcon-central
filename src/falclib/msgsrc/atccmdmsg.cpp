@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 /*
  * Machine Generated source file for message "ATC Command".
  * NOTE: The functions here must be completed by hand.
@@ -63,6 +66,10 @@ FalconATCCmdMessage::~FalconATCCmdMessage(void)
 
 int FalconATCCmdMessage::Process(uchar autodisp)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("FalconATCCmdMessage::Process");
+#else
+
     if (autodisp)
     {
         return 0;
@@ -762,4 +769,6 @@ int FalconATCCmdMessage::Process(uchar autodisp)
     }
 
     return 1;
+
+#endif
 }

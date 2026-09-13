@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <algorithm>
 
 #include <stddef.h>
@@ -724,6 +727,10 @@ int gGameType = -1;
 
 void RebuildBubble(int forced)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("RebuildBubble");
+#else
+
     float sx, sy;
     // float sx2,sy2;
     VuGridIterator *myit;
@@ -1510,6 +1517,8 @@ void RebuildBubble(int forced)
 
     sCampaignSleepRequested = 0;
     CampLeaveCriticalSection();
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1533,6 +1542,10 @@ int CampaignAllAsleep(void)
 // Check proximity of an effect to the player
 int InterestingSFX(float x, float y)
 {
+#ifdef FF_HEADLESS
+    return 0;
+#else
+
     float d, xd, yd;
     VuEntity *player;
 
@@ -1554,6 +1567,8 @@ int InterestingSFX(float x, float y)
     }
 
     return 0;
+
+#endif
 }
 
 // =======================================
@@ -2286,6 +2301,10 @@ void SetEntryTime(Flight flight)
 // This will cause the campaign to compress until the current mission's takeoff time
 int CompressCampaignUntilTakeoff(Flight flight)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CompressCampaignUntilTakeoff");
+#else
+
     WayPoint w;
 
     ShiAssert(flight);
@@ -2382,6 +2401,8 @@ int CompressCampaignUntilTakeoff(Flight flight)
         gLaunchTime = Camp_GetCurrentTime();
         return 1;
     }
+
+#endif
 }
 
 void CancelCampaignCompression(void)
@@ -2393,6 +2414,10 @@ void CancelCampaignCompression(void)
 
 void DoCompressionLoop(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DoCompressionLoop");
+#else
+
     if (gCompressTillTime > 0)
     {
         Flight pf = FalconLocalSession->GetPlayerFlight();
@@ -2520,6 +2545,8 @@ void DoCompressionLoop(void)
             SetTimeCompression(diff);
         }
     }
+
+#endif
 }
 
 void SetCampaignStartupMode(void)
@@ -2538,6 +2565,10 @@ int gAveCampTime = 0;
 // sfr: removing locks here seem to be problematic, I wonder why
 void UpdatePlayerSessions()
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UpdatePlayerSessions");
+#else
+
 #define NEW_UPDATE_PLAYER_SESSION 1
 #if NO_CAMP_LOCK and NEW_UPDATE_PLAYER_SESSION
 #else
@@ -2566,6 +2597,8 @@ void UpdatePlayerSessions()
 #else
     CampLeaveCriticalSection();
 #endif
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2580,6 +2613,10 @@ void UpdatePlayerSessions()
 
 unsigned int __stdcall HandleCampaignThread(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("HandleCampaignThread");
+#else
+
     CampaignTime deltatime;
     int sleepTic;
     int startup = 0;
@@ -2775,6 +2812,8 @@ unsigned int __stdcall HandleCampaignThread(void)
 
     TheCampaign.Flags xor_eq CAMP_RUNNING;
     return (0);
+
+#endif
 }
 
 //
@@ -2782,6 +2821,10 @@ unsigned int __stdcall HandleCampaignThread(void)
 //
 unsigned int __stdcall CampaignThread(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignThread");
+#else
+
     int Result = 0;
 
     __try
@@ -2797,6 +2840,8 @@ unsigned int __stdcall CampaignThread(void)
     }
 
     return Result;
+
+#endif
 }
 
 // ==============================================================
@@ -2807,6 +2852,10 @@ unsigned int __stdcall CampaignThread(void)
 
 void DoTacticalLoop(int startup)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DoTacticalLoop");
+#else
+
     static int stage, lastStage;
     static CampaignTime lastCheck;
     Team t;
@@ -2883,9 +2932,15 @@ void DoTacticalLoop(int startup)
     }
 
     // Update weather when in UI
+    #ifdef FF_HEADLESS
+    if (true)
+#else
     if (not SimDriver.InSim())
+#endif
         ((WeatherClass *)realWeather)
             ->UpdateWeather(); // Sim calls this otherwise
+
+#endif
 }
 
 // ==============================================================
@@ -3023,7 +3078,11 @@ void DoCampaignLoop(int startup)
     CheckDivertStatus(DIVERT_NO_DIVERT);
 
     // Update weather when in UI
+    #ifdef FF_HEADLESS
+    if (true)
+#else
     if (not SimDriver.InSim())
+#endif
     {
         ((WeatherClass *)realWeather)
             ->UpdateWeather(); // Sim calls this otherwise

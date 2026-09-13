@@ -1,19 +1,26 @@
 #include "scenario.h"
 #include <iostream>
 #include <stdexcept>
+#ifdef FF_CAMPAIGN_ENGINE
+int RunLegacyCampaign(const std::vector<std::string>& args);
+#endif
 
 int Run(const std::vector<std::string>& args) {
     using namespace ff::headless;
     if (args.size() == 2 && args[1] == "--help") {
         std::cout << "Usage: ff-campaign inspect <scenario.cam>\n"
                      "Validates archive boundaries, metadata and compressed sections.\n"
-                     "This first-stage host does not advance the campaign simulation.\n";
+                     "Run: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\n";
         return 0;
     }
     if (args.size() >= 2 && args[1] == "run") {
+#ifdef FF_CAMPAIGN_ENGINE
+        return RunLegacyCampaign(args);
+#else
         std::cerr << "{\"status\":\"not_implemented\",\"simulation_advanced\":false,"
                      "\"error\":\"Legacy campaign initialization and stepping are not connected\"}\n";
         return 3;
+#endif
     }
     if (args.size() != 3 || args[1] != "inspect") {
         std::cerr << "Usage: ff-campaign inspect <scenario.cam>\n";

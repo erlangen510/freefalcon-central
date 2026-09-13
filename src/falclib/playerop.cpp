@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 
 #include <stdio.h>
 #include <tchar.h>
@@ -158,6 +161,10 @@ extern bool ControlsXml_ActiveProfilePath(char *out, int outSize);
 //filename should be callsign of player
 int PlayerOptionsClass::LoadOptions(_TCHAR *filename)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("PlayerOptionsClass::LoadOptions");
+#else
+
     size_t success = 0;
     _TCHAR path[_MAX_PATH];
     char prof[_MAX_PATH];
@@ -249,10 +256,16 @@ int PlayerOptionsClass::LoadOptions(_TCHAR *filename)
     }
 
     return TRUE;
+
+#endif
 }
 
 void PlayerOptionsClass::ApplyOptions(void)
 {
+#ifdef FF_HEADLESS
+    return; // Audio volume and matrix renderer settings have no headless consumer.
+#else
+
     if (VM)
     {
         F4SetStreamVolume(VM->VoiceHandle(0), GroupVol[COM1_SOUND_GROUP]);
@@ -269,11 +282,17 @@ void PlayerOptionsClass::ApplyOptions(void)
     // clickablePitMode = g_bClickablePitModeDefault;
 
     SetMatrixCPUMode(0); //JAM 05Oct03 - Fixme
+
+#endif
 }
 
 //filename should be callsign of player
 int PlayerOptionsClass::SaveOptions(_TCHAR *filename)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("PlayerOptionsClass::SaveOptions");
+#else
+
     FILE *fp;
     _TCHAR path[_MAX_PATH];
     char prof[_MAX_PATH];
@@ -307,6 +326,8 @@ int PlayerOptionsClass::SaveOptions(_TCHAR *filename)
         g_bRealisticAvionics = false;
 
     return TRUE;
+
+#endif
 }
 
 

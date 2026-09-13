@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "msginc/sendvcmsg.h"
 #include "mesg.h"
 #include "tac_class.h"
@@ -131,6 +134,10 @@ int FalconSendVC::Encode(VU_BYTE** buf)
 
 int FalconSendVC::Process(uchar autodisp)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("FalconSendVC::Process");
+#else
+
     char* ptr;
 
     int count;
@@ -196,6 +203,8 @@ int FalconSendVC::Process(uchar autodisp)
 
     return 0;
     autodisp;
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -204,6 +213,10 @@ int FalconSendVC::Process(uchar autodisp)
 
 void SendVCData(FalconSessionEntity* requester)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("SendVCData");
+#else
+
     victory_condition* vc;
 
     char* ptr;
@@ -271,6 +284,8 @@ void SendVCData(FalconSessionEntity* requester)
     }
 
     FalconSendMessage(msg, TRUE);
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////

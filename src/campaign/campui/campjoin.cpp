@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 
 #include "mesg.h"
 #include "find.h"
@@ -87,6 +90,10 @@ void OpenPriorityCB(long ID, short hittype, C_Base *control);
 // This function starts the data collection process (for joining or loading a game)
 void StartCampaignGame(int local, int game_type)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("StartCampaignGame");
+#else
+
     SYSTEMTIME time;
     long timestamp;
 
@@ -159,11 +166,17 @@ void StartCampaignGame(int local, int game_type)
         SendMessage(FalconDisplay.appWin, FM_JOIN_CAMPAIGN,
                     JOIN_REQUEST_ALL_DATA, game_type);
     }
+
+#endif
 }
 
 // This is called any time we've received Campaign Scenario Status data (preload data)
 void CampaignPreloadSuccess(int remote_game)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignPreloadSuccess");
+#else
+
     if (remote_game and not TheCampaign.IsLoaded() and
         gCampJoinStatus == JOIN_REQUEST_ALL_DATA)
     {
@@ -172,10 +185,16 @@ void CampaignPreloadSuccess(int remote_game)
         PostMessage(FalconDisplay.appWin, FM_JOIN_CAMPAIGN, JOIN_CAMP_DATA_ONLY,
                     gCampJoinGameType);
     }
+
+#endif
 }
 
 void CampaignJoinSuccess(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignJoinSuccess");
+#else
+
     MonoPrint("Got all campaign data Starting it up\n");
 
     if (gMainHandler)
@@ -329,10 +348,16 @@ void CampaignJoinSuccess(void)
     }
 
     SetCampaignStartupMode();
+
+#endif
 }
 
 void CampaignJoinFail(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignJoinFail");
+#else
+
     MonoPrint("Failed to get campaign data\n");
 
     StopCampaignLoad();
@@ -350,26 +375,44 @@ void CampaignJoinFail(void)
     }
 
     CommsErrorDialog(TXT_JOINING_GAME, TXT_COMMS_NO_SERVER, NULL, NULL);
+
+#endif
 }
 
 void StopCampaignLoad(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("StopCampaignLoad");
+#else
+
     MonoPrint("Stop Campaign Load\n");
 
     gMainHandler->RemoveUserCallback(CampaignConnectionTimer);
 
     PostMessage(FalconDisplay.appWin, FM_SHUTDOWN_CAMPAIGN, 0, game_Campaign);
+
+#endif
 }
 
 // This is called when we've gotten any sort of join data to keep us from timing out
 void CampaignJoinKeepAlive(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignJoinKeepAlive");
+#else
+
     gCampJoinLastData = vuxRealTime;
+
+#endif
 }
 
 // This is the timer routine which runs during the campaign join process
 void CampaignConnectionTimer(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignConnectionTimer");
+#else
+
     ulong elapsedTime = vuxRealTime - gCampJoinLastData;
 
     // Abort entire load process if we've waited to long
@@ -394,4 +437,6 @@ void CampaignConnectionTimer(void)
          PostMessage(FalconDisplay.appWin,FM_JOIN_CAMPAIGN,JOIN_CAMP_DATA_ONLY,gCampJoinGameType);
         */
     }
+
+#endif
 }

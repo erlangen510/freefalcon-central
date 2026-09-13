@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 //
 // Brief reader functions
 //
@@ -126,6 +129,10 @@ extern bool
 
 void BuildCampBrief(C_Window *win)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("BuildCampBrief");
+#else
+
     CBX = CBY = CLineStart = 0;
     F4CSECTIONHANDLE *Leave;
 
@@ -151,17 +158,29 @@ void BuildCampBrief(C_Window *win)
     win->ScanClientAreas();
     win->RefreshWindow();
     UI_Leave(Leave);
+
+#endif
 }
 
 void BuildCampBrief(_TCHAR *brief_string)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("BuildCampBrief");
+#else
+
     CBX = CBY = CLineStart = 0;
     brief_string[0] = 0;
     BuildBriefString(NULL, brief_string);
+
+#endif
 }
 
 void BuildCampDebrief(C_Window *win)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("BuildCampDebrief");
+#else
+
     CBX = CBY = CLineStart = 0;
     F4CSECTIONHANDLE *Leave;
 
@@ -179,10 +198,16 @@ void BuildCampDebrief(C_Window *win)
 #ifdef FUNKY_KEVIN_DEBUG_STUFF
     inMission = 0;
 #endif
+
+#endif
 }
 
 void BuildCampDebrief(_TCHAR *brief_string)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("BuildCampDebrief");
+#else
+
     CBX = CBY = CLineStart = 0;
     brief_string[0] = 0;
     BuildDebriefString(NULL, brief_string);
@@ -190,10 +215,16 @@ void BuildCampDebrief(_TCHAR *brief_string)
 #ifdef FUNKY_KEVIN_DEBUG_STUFF
     inMission = 0;
 #endif
+
+#endif
 }
 
 int BuildBriefString(C_Window *win, _TCHAR *brief)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("BuildBriefString");
+#else
+
     int j, weaps, pilots;
     FlightDataClass *flight_data, *flight_ptr;
     _TCHAR current_line[MAX_STRLEN_PER_PARAGRAPH] = {0}; // Text in current line
@@ -331,10 +362,16 @@ int BuildBriefString(C_Window *win, _TCHAR *brief)
                           TheCampaign.MissionEvaluator, flight_data);
     CampLeaveCriticalSection();
     return 1;
+
+#endif
 }
 
 int BuildDebriefString(C_Window *win, _TCHAR *brief)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("BuildDebriefString");
+#else
+
     int i, j, pn, inbox, width, w, x, y;
     EventElement *theEvent;
     C_ListBox *eventListBox = NULL;
@@ -645,6 +682,8 @@ int BuildDebriefString(C_Window *win, _TCHAR *brief)
     CampLeaveCriticalSection();
 
     return 1;
+
+#endif
 }
 
 // These functions are intended to be called by the Sim for the kneeboard data
@@ -954,6 +993,10 @@ static void GetWpHeading(WayPoint wp, WayPoint lwp, _TCHAR *cline)
 // These add controls to a Window or String
 void AddHorizontalLineToBrief(C_Window *window)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AddHorizontalLineToBrief");
+#else
+
     if (window)
     {
         short CBYtemp = CBY + gFontList->GetHeight(window->Font_) / 2;
@@ -964,10 +1007,16 @@ void AddHorizontalLineToBrief(C_Window *window)
                                window->ClientArea_[0].left - 10),
             CBColor);
     }
+
+#endif
 }
 
 void AddStringToBrief(_TCHAR *buffer, C_Window *window, _TCHAR *output)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AddStringToBrief");
+#else
+
     if (not buffer[0])
         return;
 
@@ -995,20 +1044,32 @@ void AddStringToBrief(_TCHAR *buffer, C_Window *window, _TCHAR *output)
     }
 
     buffer[0] = 0;
+
+#endif
 }
 
 void GetCurrentBriefXY(int *x, int *y, _TCHAR *buffer, C_Window *window,
                        _TCHAR *output)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("GetCurrentBriefXY");
+#else
+
     // KCK: The only way we can REALLY know current x bitand y position is to have the UI add it for us
     // (and therefore do all appropriate wrapping, compression of spaces, etc, etc)
     AddStringToBrief(buffer, window, output);
     *x = CBX;
     *y = CBY;
+
+#endif
 }
 
 void AddTabToBrief(int tab, _TCHAR *buffer, C_Window *window, _TCHAR *output)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AddTabToBrief");
+#else
+
     // We have to dump our current line in order to goto a new location
     AddStringToBrief(buffer, window, output);
 
@@ -1035,10 +1096,16 @@ void AddTabToBrief(int tab, _TCHAR *buffer, C_Window *window, _TCHAR *output)
             //} while (CBX < tab-1);
         }
     }
+
+#endif
 }
 
 void AddTabToDebrief(int tab, _TCHAR *buffer, C_Window *window, _TCHAR *output)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AddTabToDebrief");
+#else
+
     AddStringToBrief(buffer, window, output);
 
     if (window)
@@ -1054,10 +1121,16 @@ void AddTabToDebrief(int tab, _TCHAR *buffer, C_Window *window, _TCHAR *output)
         AddStringToBrief(txttab, window, output);
         //} while (CBX < tab-1);
     }
+
+#endif
 }
 
 void AddEOLToBrief(_TCHAR *buffer, C_Window *window, _TCHAR *output)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AddEOLToBrief");
+#else
+
     // Dump current line
     AddStringToBrief(buffer, window, output);
 
@@ -1073,12 +1146,18 @@ void AddEOLToBrief(_TCHAR *buffer, C_Window *window, _TCHAR *output)
 
     CBX = 0;
     CLineStart = 0;
+
+#endif
 }
 
 void AddRightJustifiedStringToBrief(_TCHAR *string, int field_width,
                                     _TCHAR *buffer, C_Window *window,
                                     _TCHAR *output)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AddRightJustifiedStringToBrief");
+#else
+
     int width, x, y;
 
     if (window)
@@ -1098,11 +1177,17 @@ void AddRightJustifiedStringToBrief(_TCHAR *string, int field_width,
         AddTabToBrief(x + field_width - width, "", window, output);
 
     AddStringToBrief(string, window, output);
+
+#endif
 }
 
 void AddFontTextToBrief(_TCHAR *buffer, int font, C_Window *window,
                         _TCHAR *output)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AddFontTextToBrief");
+#else
+
     if (window)
     {
         int height, oldheight, oldfont;
@@ -1129,6 +1214,8 @@ void AddFontTextToBrief(_TCHAR *buffer, int font, C_Window *window,
     }
     else
         AddStringToBrief(buffer, window, output);
+
+#endif
 }
 
 // These add strings to a buffer
@@ -1950,6 +2037,10 @@ int ReadScriptedBriefFile(char *filename, _TCHAR *current_line, C_Window *win,
                           _TCHAR *brief, MissionEvaluationClass *mec,
                           FlightDataClass *flight_data)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ReadScriptedBriefFile");
+#else
+
     FILE *fp;
     int i, font = 0, done = 0, curr_stack = 0, stack_active[MAX_STACK] = {1};
     char token[128], *sptr;
@@ -3951,4 +4042,6 @@ int ReadScriptedBriefFile(char *filename, _TCHAR *current_line, C_Window *win,
 
     CloseCampFile(fp);
     return 1;
+
+#endif
 }

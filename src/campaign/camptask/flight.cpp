@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <stdio.h>
 #include <conio.h>
 #include <stddef.h>
@@ -4648,6 +4651,10 @@ int FlightClass::HasAreaJamming(void)
 
 int FlightClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("FlightClass::GetVehicleDeagData");
+#else
+
     static CampEntity ent;
     static int pilotSlot, queue = 0, fuelBurnt, rwindex = 0;
     int value, i;
@@ -4930,6 +4937,8 @@ int FlightClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
     simdata->waypointList = CloneWPToList(GetFirstUnitWP(), NULL);
 
     return MOTION_AIR_AI;
+
+#endif
 }
 
 int FlightClass::GetUnitWeaponId(int hp, int ac)
@@ -5181,6 +5190,10 @@ class SmsClass;
 // This function is intended to be called from the Sim Thread ONLY
 void RegroupAircraft(AircraftClass *ac)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("RegroupAircraft");
+#else
+
     int pilotSlot;
     Flight flight;
     Squadron squad; // M.N.
@@ -5224,6 +5237,8 @@ void RegroupAircraft(AircraftClass *ac)
 
     // Now update the flight's status
     flight->RecordCurrentState(NULL, FALSE);
+
+#endif
 }
 
 void CancelFlight(Flight flight)

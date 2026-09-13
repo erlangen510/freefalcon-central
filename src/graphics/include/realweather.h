@@ -165,9 +165,15 @@ public:
     RenderOTW *renderer;
     Tpoint lightningSkyPos;
     Tpoint lightningGroundPos;
+#ifndef FF_HEADLESS
     Texture overcastTexture;
+#endif
+#ifndef FF_HEADLESS
     Texture CirrusCumTextures;
+#endif
+#ifndef FF_HEADLESS
     Texture CumulusTextures;
+#endif
     WeatherCell weatherCellArray[MAX_NUM_CELLS][MAX_NUM_CELLS];
     int numCells, halfCells, cellSize, shadowCell, drawableCell, halfSize,
         vpShift, weatherCondition, weatherShiftX, weatherShiftY;
@@ -223,7 +229,9 @@ protected:
     Real3DCloud *real3DClouds;
     Tpoint lightningPos, lightVector;
     DWORD oldTimeMS, startMS, intervalMS;
+#ifndef FF_HEADLESS
     Texture rainTexture, lightningTexture;
+#endif
     BOOL bSetup, greenMode, belowLayer, insideLayer, updateLighting,
         drawLightning, didOnce;
     float lZM, lRad, lDist, rainX, rainY, rainZ, sunMag, sunAngle, sunYaw;

@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 /*
  * Machine Generated source file for message "Radio Chatter Message".
  * NOTE: The functions here must be completed by hand.
@@ -193,6 +196,10 @@ int FalconRadioChatterMessage::Encode(VU_BYTE **buf)
 
 int FalconRadioChatterMessage::Process(uchar autodisp)
 {
+#ifdef FF_HEADLESS
+    return 0;
+#else
+
     if (autodisp)
         return 0;
 
@@ -441,6 +448,8 @@ int FalconRadioChatterMessage::Process(uchar autodisp)
     }
 
     return 0;
+
+#endif
 }
 
 // ==============================

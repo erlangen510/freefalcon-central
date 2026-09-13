@@ -4,6 +4,11 @@
 #ifndef _WINDOWS_
 #include <windows.h>
 #endif
+#ifdef FF_HEADLESS
+// The campaign publishes optional window notifications, but owns no display.
+struct FalconDisplayConfiguration { HWND appWin = nullptr; };
+extern FalconDisplayConfiguration FalconDisplay;
+#else
 #include "graphics/include/devmgr.h"
 #include "graphics/include/device.h"
 
@@ -78,4 +83,5 @@ protected:
 
 extern FalconDisplayConfiguration FalconDisplay;
 
+#endif // FF_HEADLESS
 #endif

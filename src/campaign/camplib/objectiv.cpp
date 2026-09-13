@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <stddef.h>
 #include <fcntl.h>
 #include <io.h>
@@ -687,6 +690,10 @@ void ObjectiveClass::SendDeaggregateData(VuTargetEntity *target)
 
 int ObjectiveClass::Deaggregate(FalconSessionEntity *session)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::Deaggregate");
+#else
+
     if (not IsLocal() or not IsAggregate())
     {
         return 0;
@@ -816,11 +823,17 @@ int ObjectiveClass::Deaggregate(FalconSessionEntity *session)
 #endif
 
     return 1;
+
+#endif
 }
 
 //int ObjectiveClass::RecordCurrentState (FalconSessionEntity *session, int byReag)
 int ObjectiveClass::RecordCurrentState(FalconSessionEntity *session, int)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::RecordCurrentState");
+#else
+
     // Record current state of components
     if (GetComponents())
     {
@@ -848,11 +861,17 @@ int ObjectiveClass::RecordCurrentState(FalconSessionEntity *session, int)
 
     ResetObjectiveStatus();
     return 0;
+
+#endif
 }
 
 //int ObjectiveClass::Reaggregate (FalconSessionEntity* session)
 int ObjectiveClass::Reaggregate(FalconSessionEntity *)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::Reaggregate");
+#else
+
     if (IsAggregate() or not IsLocal())
         return 0;
 
@@ -916,10 +935,16 @@ int ObjectiveClass::Reaggregate(FalconSessionEntity *)
 #endif
 
     return 1;
+
+#endif
 }
 
 int ObjectiveClass::TransferOwnership(FalconSessionEntity *session)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::TransferOwnership");
+#else
+
     if (IsAggregate() or not IsLocal())
         return 0;
 
@@ -971,10 +996,16 @@ int ObjectiveClass::TransferOwnership(FalconSessionEntity *session)
     }
 
     return 1;
+
+#endif
 }
 
 int ObjectiveClass::Wake()
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::Wake");
+#else
+
     // sfr: in MP we need to run entities even if we are not in game
 #if not NEW_WAKE
     if (not OTWDriver.IsActive())
@@ -998,10 +1029,16 @@ int ObjectiveClass::Wake()
     // RemoveFromSimLists();
 
     return 1;
+
+#endif
 }
 
 int ObjectiveClass::Sleep(void)
 {
+#ifdef FF_HEADLESS
+    SetAwake(0); return 1;
+#else
+
     // OTWDriver.LockObject ();
     // 2002-04-14 put back in by MN - we need to sleep our features, and this does it,
     //while a more general function name could have been chosen ;)
@@ -1015,10 +1052,16 @@ int ObjectiveClass::Sleep(void)
     // OTWDriver.UnLockObject ();
 
     return 1;
+
+#endif
 }
 
 void ObjectiveClass::InsertInSimLists(float cameraX, float cameraY)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::InsertInSimLists");
+#else
+
     // SetChecked(1);
 
     // This case is for the destructor's sleep call.
@@ -1035,19 +1078,31 @@ void ObjectiveClass::InsertInSimLists(float cameraX, float cameraY)
     SimDriver.AddToCampFeatList(this);
     cameraX;
     cameraY;
+
+#endif
 }
 
 void ObjectiveClass::RemoveFromSimLists(void)
 {
+#ifdef FF_HEADLESS
+    SetInSimLists(0);
+#else
+
     if (not InSimLists())
         return;
 
     SetInSimLists(0);
     SimDriver.RemoveFromCampFeatList(this);
+
+#endif
 }
 
 void ObjectiveClass::DeaggregateFromData(VU_BYTE *data, long size)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::DeaggregateFromData");
+#else
+
     if (IsLocal() or not IsAggregate() or FalconLocalGame->IsLocal())
     {
         return;
@@ -1178,10 +1233,16 @@ void ObjectiveClass::DeaggregateFromData(VU_BYTE *data, long size)
 #else
     deaggregatedMap->insert(CampBaseBin(this));
 #endif
+
+#endif
 }
 
 void ObjectiveClass::ReaggregateFromData(VU_BYTE *data, long size)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::ReaggregateFromData");
+#else
+
     if (IsLocal() or IsAggregate())
         return;
 
@@ -1230,10 +1291,16 @@ void ObjectiveClass::ReaggregateFromData(VU_BYTE *data, long size)
 #else
     deaggregatedMap->remove(this->Id());
 #endif
+
+#endif
 }
 
 void ObjectiveClass::TransferOwnershipFromData(VU_BYTE *data, long size)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ObjectiveClass::TransferOwnershipFromData");
+#else
+
     if (IsAggregate() or IsLocal() or not data)
     {
         return;
@@ -1284,6 +1351,8 @@ void ObjectiveClass::TransferOwnershipFromData(VU_BYTE *data, long size)
     }
 
     return;
+
+#endif
 }
 
 // This Apply damage is called only for local entities, and resolves the number and type

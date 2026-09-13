@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 /*
  * Machine Generated source file for message "Weapon Fire".
  * NOTE: The functions here must be completed by hand.
@@ -49,6 +52,10 @@ FalconWeaponsFire::~FalconWeaponsFire(void)
 extern bool g_bLogEvents;
 int FalconWeaponsFire::Process(uchar autodisp)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("FalconWeaponsFire::Process");
+#else
+
     FalconEntity* theEntity;
     FalconEntity* theTarget = NULL;
     SimBaseClass* simEntity = NULL;
@@ -280,4 +287,6 @@ int FalconWeaponsFire::Process(uchar autodisp)
     }
 
     return TRUE;
+
+#endif
 }

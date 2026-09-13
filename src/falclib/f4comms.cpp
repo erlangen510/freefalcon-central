@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <objbase.h>
 #ifdef _WIN32
 #include <cguid.h> // predefined COM GUIDs -- unused here (only our own DEFINE_GUID below); Windows-only
@@ -147,6 +150,10 @@ extern bool g_bACPlayerCTDFix;
 
 int InitCommsStuff(ComDataClass* comData)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("InitCommsStuff");
+#else
+
     g_ipadress = ComAPIinet_htoa(comData->ip_address); //me123
 
     // we need to create both handles on startup, so as to haev the ports available
@@ -235,6 +242,8 @@ int InitCommsStuff(ComDataClass* comData)
 
     ComAPISetTimeStampFunction(TimeStampFunction);
     return gConnectionStatus;
+
+#endif
 }
 
 
@@ -284,6 +293,10 @@ int F4CommsConnectionCallback(int result)
 
 int CleanupComms(void)
 {
+#ifdef FF_HEADLESS
+    return 0;
+#else
+
     gConnectionStatus = 0;
 
     if (FalconGlobalUDPHandle)
@@ -307,10 +320,16 @@ int CleanupComms(void)
     FalconGlobalTCPHandle = NULL;
     FalconServerTCPStatus = VU_CONN_INACTIVE;
     return (TRUE);
+
+#endif
 }
 
 int EndCommsStuff(void)
 {
+#ifdef FF_HEADLESS
+    return 0;
+#else
+
     if (gMainThread)
     {
         gMainThread->LeaveGame();
@@ -337,6 +356,8 @@ int EndCommsStuff(void)
     CleanupComms();
 
     return (TRUE);
+
+#endif
 }
 
 void SetupMessageSizes(int protocol)
@@ -399,6 +420,10 @@ void CleanupDanglingList(void)
 //void AddDanglingSession (com_API_handle ch1, com_API_handle ch2, VU_SESSION_ID id, VU_ADDRESS address)
 bool AddDanglingSession(VU_ID owner, VU_ADDRESS address)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("AddDanglingSession");
+#else
+
     VuEnterCriticalSection();
     FalconSessionEntity* tempSess = NULL;
 
@@ -465,6 +490,8 @@ bool AddDanglingSession(VU_ID owner, VU_ADDRESS address)
     DanglingSessionsList->ForcedInsert(tempSess);
     VuExitCriticalSection();
     return true;
+
+#endif
 }
 
 //removes a dangling to open a permanent one (newSess)
@@ -570,6 +597,10 @@ int UpdateDanglingSessions(void)
 #if 0
 void TcpAcceptCallback(ComAPIHandle ch)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("TcpAcceptCallback");
+#else
+
     ulong ipaddr;
     VuSessionEntity* s;
     VuSessionsIterator siter(vuGlobalGroup);
@@ -595,12 +626,18 @@ void TcpAcceptCallback(ComAPIHandle ch)
 
     MonoPrint("TcpAcceptCallback error -- couldn't find session 0x%x\n", ipaddr);
     // should we disconnect here?
+
+#endif
 }
 
 // This gets called as a result of us calling ComTCPOpenConnect (attempting to connect TCP)
 // ret == 0 means success
 void TcpConnectCallback(ComAPIHandle ch, int ret)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("TcpConnectCallback");
+#else
+
     ulong ipaddr;
 
     ipaddr = ComAPIQuery(ch, COMAPI_CONNECTION_ADDRESS);
@@ -673,12 +710,18 @@ void TcpConnectCallback(ComAPIHandle ch, int ret)
     // Add this connection to our "dangling connection" list
     AddDanglingSession(NULL, ch, ipaddr, ipaddr);
     VuExitCriticalSection();
+
+#endif
 }
 
 // This gets called as a result of us calling ComDPLAYOpen and getting a modem connection
 // ret == 0 means success
 void ModemConnectCallback(ComAPIHandle ch, int ret)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ModemConnectCallback");
+#else
+
     ulong ipaddr;
 
     ipaddr = ComAPIQuery(ch, COMAPI_CONNECTION_ADDRESS);
@@ -726,6 +769,8 @@ void ModemConnectCallback(ComAPIHandle ch, int ret)
     AddDanglingSession(NULL, ch,  ipaddr, ipaddr);
     MonoPrint("ModemConnectCallback invoked: saving handle..\n");
     VuExitCriticalSection();
+
+#endif
 }
 #endif
 
@@ -738,6 +783,10 @@ void ModemConnectCallback(ComAPIHandle ch, int ret)
 //why are we taking force as a parameter when we aren't using it?
 void ResyncTimes()
 {
+#ifdef FF_HEADLESS
+    return;
+#else
+
     int count, best_comp;
     VuGroupEntity* g = FalconLocalGame;
     VuEnterCriticalSection();
@@ -833,6 +882,8 @@ void ResyncTimes()
         msg->RequestOutOfBandTransmit();
         FalconSendMessage(msg, TRUE);
     }
+
+#endif
 }
 
 // Time stamp function used by Comms and Vu to try and reduce latency in time stamping
@@ -857,6 +908,10 @@ bool VuxAddDanglingSession(VU_ID owner, VU_ADDRESS address)
 // Set up a handle to communicate via UDP with everyone in this group.
 int VuxGroupConnect(VuGroupEntity* group)
 {
+#ifdef FF_HEADLESS
+    return 0;
+#else
+
     char buffer[100], *name;
 
     if (group->IsGame())
@@ -972,10 +1027,16 @@ int VuxGroupConnect(VuGroupEntity* group)
         gUICommsQ->Add(_Q_GAME_ADD_, FalconNullId, group->Id());
 
     return 0;
+
+#endif
 }
 
 void VuxGroupDisconnect(VuGroupEntity* group)
 {
+#ifdef FF_HEADLESS
+    return;
+#else
+
     com_API_handle ch;
 
     if (group->IsGame())
@@ -1006,11 +1067,17 @@ void VuxGroupDisconnect(VuGroupEntity* group)
 
     if (gUICommsQ and group->IsGame())
         gUICommsQ->Add(_Q_GAME_REMOVE_, FalconNullId, group->Id());
+
+#endif
 }
 
 
 int VuxGroupAddSession(VuGroupEntity* group, VuSessionEntity* session)
 {
+#ifdef FF_HEADLESS
+    return 0;
+#else
+
     com_API_handle gh, sh;
 
     if (g_bVoiceCom)
@@ -1116,10 +1183,16 @@ int VuxGroupAddSession(VuGroupEntity* group, VuSessionEntity* session)
     }
 
     return 1;
+
+#endif
 }
 
 int VuxGroupRemoveSession(VuGroupEntity* group, VuSessionEntity* session)
 {
+#ifdef FF_HEADLESS
+    return 0;
+#else
+
     // check if session is in group
     if (not group->SessionInGroup(session))
     {
@@ -1194,11 +1267,17 @@ int VuxGroupRemoveSession(VuGroupEntity* group, VuSessionEntity* session)
     ((FalconSessionEntity*)session)->SetAssignedPlayerFlight(NULL);
 
     return 1;
+
+#endif
 }
 
 // Set up a handle to communicate this session.
 int VuxSessionConnect(VuSessionEntity* session)
 {
+#ifdef FF_HEADLESS
+    return 0;
+#else
+
     // char buffer[100];
     int wait_for_connection = 0;
 
@@ -1271,10 +1350,16 @@ int VuxSessionConnect(VuSessionEntity* session)
 
 
     return 0;
+
+#endif
 }
 
 void VuxSessionDisconnect(VuSessionEntity* session)
 {
+#ifdef FF_HEADLESS
+    return;
+#else
+
 
     if (session == FalconLocalSession)
         return;
@@ -1381,6 +1466,8 @@ void VuxSessionDisconnect(VuSessionEntity* session)
     if (session and ch and ch not_eq FalconGlobalTCPHandle)
     ComAPIClose(ch);
     */
+
+#endif
 }
 
 

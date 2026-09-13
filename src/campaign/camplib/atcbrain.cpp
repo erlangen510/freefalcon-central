@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "stdhdr.h"
 #include "atcbrain.h"
 #include "campbase.h"
@@ -328,6 +331,10 @@ void ATCBrain::ProcessInbound(void)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::ProcessRunways(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::ProcessRunways");
+#else
+
     int i, rwindex;
     runwayQueueStruct *nextLand[4]; //room for bigger airbases :)
 
@@ -444,12 +451,18 @@ void ATCBrain::ProcessRunways(void)
             ProcessQueue(i);
         }
     }
+
+#endif
 }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::ProcessQueue(int queue)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::ProcessQueue");
+#else
+
     AircraftClass *aircraft = NULL;
     runwayQueueStruct *info = NULL;
     runwayQueueStruct *deleteInfo = NULL;
@@ -1047,6 +1060,8 @@ void ATCBrain::ProcessQueue(int queue)
             deleteInfo = info;
         }
     }
+
+#endif
 }
 
 
@@ -1055,6 +1070,10 @@ void ATCBrain::ProcessQueue(int queue)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::ProcessPlayers(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::ProcessPlayers");
+#else
+
     float dx, dy, cosAngle;
     int queue;
     runwayQueueStruct *playerInfo;
@@ -1527,6 +1546,8 @@ void ATCBrain::ProcessPlayers(void)
 
         session = (FalconSessionEntity *)sit.GetNext();
     }
+
+#endif
 }
 
 /*----------------------------------*/
@@ -1826,6 +1847,10 @@ void ATCBrain::RequestEmerClearance(AircraftClass *approaching)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::RequestTakeoff(AircraftClass *departing)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::RequestTakeoff");
+#else
+
     runwayQueueStruct *info = NULL;
     runwayQueueStruct *nextTakeoff = NULL;
 
@@ -2100,11 +2125,17 @@ void ATCBrain::RequestTakeoff(AircraftClass *departing)
             aircraft = (AircraftClass *)flightIter.GetNext();
         }
     }
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::RequestTaxi(AircraftClass *departing)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::RequestTaxi");
+#else
+
     int queue = 0, rwindex = 0;
     VU_TIME takeoffTime = 0;
     Flight flight;
@@ -2333,11 +2364,17 @@ void ATCBrain::RequestTaxi(AircraftClass *departing)
         radioMessage->dataBlock.time_to_play = 2 * CampaignSeconds;
         FalconSendMessage(radioMessage, FALSE);
     }
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::AbortApproach(AircraftClass *approaching)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::AbortApproach");
+#else
+
     runwayQueueStruct *info = NULL;
     FalconRadioChatterMessage *radioMessage = NULL;
 
@@ -2364,6 +2401,8 @@ void ATCBrain::AbortApproach(AircraftClass *approaching)
      radioMessage->dataBlock.time_to_play= 2*CampaignSeconds;
      FalconSendMessage(radioMessage, FALSE);
     */
+
+#endif
 }
 
 
@@ -2454,6 +2493,10 @@ void ATCBrain::SetEmergency(int queue)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::ReschedulePlanes(int queue)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::ReschedulePlanes");
+#else
+
     AircraftClass *aircraft = NULL;
     runwayQueueStruct *info = NULL;
     runwayQueueStruct *deleteInfo = NULL;
@@ -2497,6 +2540,8 @@ void ATCBrain::ReschedulePlanes(int queue)
 
         deleteInfo = info;
     }
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2701,6 +2746,10 @@ void ATCBrain::CalculateMinMaxTime(AircraftClass *aircraft, int rwindex,
                                    AtcStatusEnum status, CampaignTime *min,
                                    CampaignTime *max, float cosAngle)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::CalculateMinMaxTime");
+#else
+
     float finalX, finalY, baseX, baseY, px, py, dist, dx, dy, finalDist;
     float decelDist, decelTime, finAngle, norm;
     float PatternSpd = aircraft->af->MinVcas() * KNOTS_TO_FTPSEC;
@@ -2948,6 +2997,8 @@ void ATCBrain::CalculateMinMaxTime(AircraftClass *aircraft, int rwindex,
         //we should never get here
         ShiWarning("We are in an undefined state, we shouldn't be here");
     }
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3659,6 +3710,10 @@ runwayQueueStruct *ATCBrain::NextToLand(int queue)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int ATCBrain::CheckVector(AircraftClass *aircraft, runwayQueueStruct *info)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::CheckVector");
+#else
+
     float x, y, z, dx, dy, cosAngle, dist;
     float norm, vt, cosHdg, sinHdg, relx, rely;
     float turnDist, speed, deltaTime;
@@ -3914,12 +3969,18 @@ int ATCBrain::CheckVector(AircraftClass *aircraft, runwayQueueStruct *info)
 
     // End if statement breakup
     return FALSE;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::FindFinalPt(AircraftClass *approaching, int rwindex, float *x,
                            float *y)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::FindFinalPt");
+#else
+
     float dist;
     float px, py;
 
@@ -3931,6 +3992,8 @@ void ATCBrain::FindFinalPt(AircraftClass *approaching, int rwindex, float *x,
 
     *x = px + dist * PtHeaderDataTable[rwindex].cosHeading;
     *y = py + dist * PtHeaderDataTable[rwindex].sinHeading;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4169,6 +4232,10 @@ int ATCBrain::FindRunwayPt(FlightClass *flight, int vehicleInUnit, int rwindex,
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float ATCBrain::GetAltitude(AircraftClass *aircraft, AtcStatusEnum status)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::GetAltitude");
+#else
+
     float alt = 0.0F;
     Tpoint pos;
     SimBaseClass *entity = NULL;
@@ -4232,6 +4299,8 @@ float ATCBrain::GetAltitude(AircraftClass *aircraft, AtcStatusEnum status)
     }
 
     return alt;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4624,6 +4693,10 @@ void ATCBrain::RemoveInbound(runwayQueueStruct *info)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::GiveOrderToWingman(AircraftClass *us, AtcStatusEnum status)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::GiveOrderToWingman");
+#else
+
     runwayQueueStruct *wingmanInfo = NULL;
     AircraftClass *wingman = NULL;
 
@@ -4654,6 +4727,8 @@ void ATCBrain::GiveOrderToWingman(AircraftClass *us, AtcStatusEnum status)
         wingmanInfo->status = tPrepToTakeRunway;
         SendCmdMessage(wingman, wingmanInfo);
     }
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5004,6 +5079,10 @@ int ATCBrain::GetRunwayName(int rwindex)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::MakeVectorCall(AircraftClass *aircraft, VuTargetEntity *target)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::MakeVectorCall");
+#else
+
     FalconRadioChatterMessage *radioMessage = NULL;
     int rwindex, index;
     float x, y, z, speed, cosAngle;
@@ -5277,6 +5356,8 @@ void ATCBrain::MakeVectorCall(AircraftClass *aircraft, VuTargetEntity *target)
     }
 
     delete radioMessage;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5335,6 +5416,10 @@ int ATCBrain::GetTakeoffNumber(runwayQueueStruct *takeoffInfo)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int ATCBrain::GetOppositeRunway(int rwindex)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::GetOppositeRunway");
+#else
+
     // 2002-04-08 MN CTD fix
     int runway = 0;
 
@@ -5350,11 +5435,17 @@ int ATCBrain::GetOppositeRunway(int rwindex)
         runway = 0;
 
     return runway;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 SimBaseClass *CheckPointGlobal(AircraftClass *self, float x, float y)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("3D taxi point lookup");
+#else
+
     float tmpX, tmpY;
     SimBaseClass *testObject;
     float myRad, testRad;
@@ -5403,11 +5494,17 @@ SimBaseClass *CheckPointGlobal(AircraftClass *self, float x, float y)
     }
 
     return NULL;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 SimBaseClass *CheckPointGlobal(CampBaseClass *unit, float x, float y)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("3D taxi point lookup");
+#else
+
     float tmpX, tmpY;
     SimBaseClass *testObject;
     float myRad, testRad;
@@ -5473,11 +5570,17 @@ SimBaseClass *CheckPointGlobal(CampBaseClass *unit, float x, float y)
     }
 
     return NULL;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 SimBaseClass *CheckTaxiPointGlobal(AircraftClass *self, float x, float y)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CheckTaxiPointGlobal");
+#else
+
     float tmpX, tmpY;
     bool BigBoy = false;
     SimBaseClass *testObject;
@@ -5554,6 +5657,8 @@ SimBaseClass *CheckTaxiPointGlobal(AircraftClass *self, float x, float y)
     }
 
     return closest;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5581,6 +5686,10 @@ int ATCBrain::NumOperableRunways(void)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int ATCBrain::CheckLanding(AircraftClass *aircraft, runwayQueueStruct *landInfo)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::CheckLanding");
+#else
+
     ShiAssert(landInfo);
     FalconRadioChatterMessage *radioMessage;
     int queue = PtHeaderDataTable[landInfo->rwindex].runwayNum;
@@ -5629,11 +5738,17 @@ int ATCBrain::CheckLanding(AircraftClass *aircraft, runwayQueueStruct *landInfo)
     }
 
     return FALSE;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int ATCBrain::CheckTakeoff(AircraftClass *aircraft, runwayQueueStruct *info)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::CheckTakeoff");
+#else
+
     FalconRadioChatterMessage *radioMessage;
 
     if (not aircraft->OnGround() and
@@ -5688,12 +5803,18 @@ int ATCBrain::CheckTakeoff(AircraftClass *aircraft, runwayQueueStruct *info)
     }
 
     return FALSE;
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::CheckFinalApproach(AircraftClass *aircraft,
                                   runwayQueueStruct *info)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::CheckFinalApproach");
+#else
+
     int curTaxiPoint, queue;
     float x, y, dx, dy, dist, cosAngle;
 
@@ -5764,6 +5885,8 @@ void ATCBrain::CheckFinalApproach(AircraftClass *aircraft,
         info->status = lAborted;
         SendCmdMessage(aircraft, info);
     }
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5893,6 +6016,10 @@ void ATCBrain::FindAbortPt(AircraftClass *aircraft, float *x, float *y,
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::RemoveFromAllOtherATCs(AircraftClass *aircraft)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("RemoveFromAllOtherATCs");
+#else
+
     ObjectiveClass *curObj;
     runwayQueueStruct *info;
 
@@ -5920,11 +6047,17 @@ void ATCBrain::RemoveFromAllOtherATCs(AircraftClass *aircraft)
 
         curObj = (ObjectiveClass *)findWalker.GetNext();
     }
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::RemoveFromAllATCs(AircraftClass *aircraft)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("RemoveFromAllATCs");
+#else
+
     ObjectiveClass *curObj;
     runwayQueueStruct *info;
 
@@ -5952,6 +6085,8 @@ void ATCBrain::RemoveFromAllATCs(AircraftClass *aircraft)
 
         curObj = (ObjectiveClass *)findWalker.GetNext();
     }
+
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6096,6 +6231,10 @@ ulong ATCBrain::RemovePlaceHolders(VU_ID id)
 void ATCBrain::CheckForTraffic(AircraftClass *aircraft,
                                runwayQueueStruct *playerInfo)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("ATCBrain::CheckForTraffic");
+#else
+
     // check 'checkTrafficTime'; if not time, skip traffic routine:  check every 10 seconds
     if (self->brain->checkTrafficTime < SimLibElapsedTime)
     {
@@ -6185,4 +6324,6 @@ void ATCBrain::CheckForTraffic(AircraftClass *aircraft,
             playerInfo->lastContacted = SimLibElapsedTime;
         }
     }
+
+#endif
 }

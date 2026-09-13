@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <stdio.h>
 #include <conio.h>
 #include <stddef.h>
@@ -186,6 +189,10 @@ int TaskForceClass::GetUnitSpeed() const
 
 int TaskForceClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("TaskForceClass::GetVehicleDeagData");
+#else
+
     static CampEntity ent;
     static int round;
     int dist, i, ptIndexAt;
@@ -339,6 +346,8 @@ int TaskForceClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
     simdata->waypointList = CloneWPToList(GetFirstUnitWP(), NULL);
 
     return MOTION_GND_AI;
+
+#endif
 }
 
 

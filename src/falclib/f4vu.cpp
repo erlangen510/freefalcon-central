@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 /** @file F4VU.cpp
 * implementation of application specific part of VU
 */
@@ -200,13 +203,21 @@ VuEntity* VuxCreateEntity(ushort type, ushort size, VU_BYTE* dataPtr)
     {
     case (CLASS_VEHICLE):
     {
+        #ifdef FF_HEADLESS
+        ff_headless::unsupported("3D vehicle creation");
+#else
         retval = SimVUCreateVehicle(type, size, dataPtr);
+#endif
         break;
     }
 
     case (TYPE_EJECT):
     {
+        #ifdef FF_HEADLESS
+        ff_headless::unsupported("3D vehicle creation");
+#else
         retval = SimVUCreateVehicle(type, size, dataPtr);
+#endif
         break;
     }
 

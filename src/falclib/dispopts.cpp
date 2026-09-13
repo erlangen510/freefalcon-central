@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 /***************************************************************************\
     Dispopts.h
     Miro "Jammer" Torrielli
@@ -32,6 +35,10 @@ DisplayOptionsClass::DisplayOptionsClass(void)
 
 void DisplayOptionsClass::Initialize(void)
 {
+#ifdef FF_HEADLESS
+    DispWidth = 1024; DispHeight = 768; DispDepth = 32;
+#else
+
     // Artscout - 2026: zero the whole object first so padding bytes and any field not explicitly set
     // below are 0, never 0xCC (debug uninitialized fill). SaveOptions does a raw fwrite(this), so any
     // leftover 0xCC would be persisted and read back as garbage on the next run -- this is exactly how
@@ -74,10 +81,16 @@ void DisplayOptionsClass::Initialize(void)
     m_texMode = TEX_MODE_DDS;
 
     FalconDisplay.SetSimMode(DispWidth, DispHeight, DispDepth);
+
+#endif
 }
 
 int DisplayOptionsClass::LoadOptions(char *filename)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DisplayOptionsClass::LoadOptions");
+#else
+
     char path[_MAX_PATH];
 
     // Artscout - 2026: display options are now XML (display.xml) instead of the old raw-fwrite(this)
@@ -248,10 +261,16 @@ int DisplayOptionsClass::LoadOptions(char *filename)
     FalconDisplay.SetSimMode(DispWidth, DispHeight, DispDepth);
 
     return TRUE;
+
+#endif
 }
 
 int DisplayOptionsClass::SaveOptions(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DisplayOptionsClass::SaveOptions");
+#else
+
     char path[_MAX_PATH];
 
     sprintf(path, "%s/config/display.xml", FalconDataDirectory);
@@ -333,6 +352,8 @@ int DisplayOptionsClass::SaveOptions(void)
     }
 
     return TRUE;
+
+#endif
 }
 
 void DisplayOptionsClass::SetDevCaps(unsigned int devCaps)

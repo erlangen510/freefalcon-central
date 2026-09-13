@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <io.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -298,6 +301,30 @@ void CampaignClass::Reset(void)
 F4THREADHANDLE CampaignClass::InitCampaign(FalconGameType gametype,
                                            FalconGameEntity *joingame)
 {
+#ifdef FF_HEADLESS
+    if (gametype != game_Campaign || joingame) ff_headless::unsupported("only offline campaign games are supported");
+    if (IsLoaded()) EndCampaign();
+    ResetNamespaces();
+    SetCampaignStartupMode();
+    delete MissionEvaluator;
+    MissionEvaluator = new MissionEvaluationClass();
+    MissionEvaluator->PreDogfightEval();
+    FalconGameEntity* game = new FalconGameEntity(FalconLocalSession->Domain(), "Headless campaign");
+    game->gameType = game_Campaign;
+    game->SetMaxSessions(1);
+    CurrentGame.reset(game);
+    vuDatabase->Insert(game);
+    gMainThread->JoinGame(game);
+    ((WeatherClass*)realWeather)->Init(false);
+    if (!LoadTheater(TheaterName)) return 0;
+    Flags |= CAMP_THEATER_LOADED;
+    InitCampaignLists();
+    TheaterSizeX = Map_Max_X; TheaterSizeY = Map_Max_Y;
+    gLastId = 32767;
+    InitTheaterLists();
+    return 1;
+#else
+
     FalconGameEntity *newgame;
     _TCHAR *gamename;
 
@@ -392,7 +419,9 @@ F4THREADHANDLE CampaignClass::InitCampaign(FalconGameType gametype,
 
     if (gNavigationSys)
     {
+        #ifndef FF_HEADLESS
         delete gNavigationSys;
+#endif
     }
 
     gTacanList = new TacanList;
@@ -413,10 +442,16 @@ F4THREADHANDLE CampaignClass::InitCampaign(FalconGameType gametype,
     CampEnterCriticalSection();
 #endif
     return 1;
+
+#endif
 }
 
 DWORD CampaignClass::LoopStarter(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignClass::LoopStarter");
+#else
+
     DWORD retval = NULL;
 
     campRunning = TRUE;
@@ -424,6 +459,8 @@ DWORD CampaignClass::LoopStarter(void)
     ThreadManager::start_campaign_thread(CampaignThread);
 
     return (retval);
+
+#endif
 }
 
 int CampaignClass::NewCampaign(FalconGameType gametype, char *savefile)
@@ -604,7 +641,11 @@ int CampaignClass::LoadCampaign(FalconGameType gametype, char *savefile)
     Flags or_eq CAMP_LOADED;
 
     // Insert our game into the database - which will broadcast it if we're online
+    #ifdef FF_HEADLESS
+    VuGameEntity *game = CurrentGame.get();
+#else
     VuGameEntity *game = gCommsMgr->GetTargetGame();
+#endif
     vuDatabase->/*Quick*/ Insert(game);
     EndReadCampFile();
 
@@ -849,6 +890,10 @@ int CampaignClass::JoinCampaign(FalconGameType gametype, FalconGameEntity *game)
 
 int CampaignClass::StartRemoteCampaign(FalconGameEntity *game)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignClass::StartRemoteCampaign");
+#else
+
     if (not IsLoaded() or (Flags bitand CAMP_NEED_MASK))
         return 0;
 
@@ -866,12 +911,19 @@ int CampaignClass::StartRemoteCampaign(FalconGameEntity *game)
     SetTimeCompression(1);
 
     return 1;
+
+#endif
 }
 
 // This gets called every time we receive startup information.
 // We check if we have everything and set ourselves up if we do.
 void CampaignClass::GotJoinData(void)
 {
+#ifdef FF_HEADLESS
+    if (IsLoaded()) return;
+    ff_headless::unsupported("remote campaign join");
+#else
+
     ulong still_needed = Flags bitand CAMP_NEED_MASK;
 
     MonoPrint("Got Join data Still needed = %x\n", still_needed);
@@ -888,6 +940,8 @@ void CampaignClass::GotJoinData(void)
     if (gMainHandler)
         PostMessage(FalconDisplay.appWin, FM_JOIN_SUCCEEDED,
                     not FalconLocalGame->IsLocal(), 0);
+
+#endif
 }
 
 #define CAMP_SAVE_NORMAL 0
@@ -897,6 +951,10 @@ void CampaignClass::GotJoinData(void)
 int CampaignClass::SaveCampaign(FalconGameType gametype, char *savefile,
                                 int save_mode)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignClass::SaveCampaign");
+#else
+
     FILE *fp;
     char to[MAX_PATH], from[MAX_PATH];
 
@@ -986,6 +1044,8 @@ int CampaignClass::SaveCampaign(FalconGameType gametype, char *savefile,
 
     CampLeaveCriticalSection();
     return 1;
+
+#endif
 }
 
 #if NEW_END_CAMPAIGN
@@ -1050,7 +1110,9 @@ void CampaignClass::EndCampaign()
 
     if (gCommsMgr)
     {
+        #ifndef FF_HEADLESS
         gCommsMgr->LookAtGame(vuPlayerPoolGroup);
+#endif
     }
 
     gMainThread->JoinGame(vuPlayerPoolGroup);
@@ -1112,7 +1174,9 @@ void CampaignClass::EndCampaign()
 
     if (gNavigationSys)
     {
+        #ifndef FF_HEADLESS
         delete gNavigationSys;
+#endif
     }
 
     if (gTacanList)
@@ -1132,7 +1196,9 @@ void CampaignClass::EndCampaign()
 
     if (gCommsMgr)
     {
+        #ifndef FF_HEADLESS
         gCommsMgr->LookAtGame(vuPlayerPoolGroup);
+#endif
     }
 
     gMainThread->JoinGame(vuPlayerPoolGroup);
@@ -1926,6 +1992,10 @@ int CampaignClass::LoadScenarioStats(FalconGameType type, char *savefile)
 
 int CampaignClass::RequestScenarioStats(FalconGameEntity *game)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CampaignClass::RequestScenarioStats");
+#else
+
     FalconSessionEntity *masterSession;
     FalconRequestCampaignData *camprequest;
 
@@ -1996,6 +2066,8 @@ int CampaignClass::RequestScenarioStats(FalconGameEntity *game)
     ReadValidAircraftTypes("ValidAC");
 
     return 1;
+
+#endif
 }
 
 void CampaignClass::ClearCurrentPreload(void)
@@ -2017,6 +2089,10 @@ void CampaignClass::ClearCurrentPreload(void)
 // Esentially pauses the thread without stopping time
 void CampaignClass::Suspend(void)
 {
+#ifdef FF_HEADLESS
+    Flags |= CAMP_SUSPENDED;
+#else
+
     if (IsSuspended())
     {
         return;
@@ -2031,6 +2107,8 @@ void CampaignClass::Suspend(void)
     }
 
     ThreadManager::slow_campaign();
+
+#endif
 }
 
 void CampaignClass::Resume(void)
@@ -2575,6 +2653,10 @@ void TrashInstantActionObjectives(void)
 // This will convert the current campaign to instant action format
 void Camp_MakeInstantAction(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("Camp_MakeInstantAction");
+#else
+
     TheCampaign.Flags or_eq CAMP_LIGHT;
     TheCampaign.DisposeEventLists();
     TheCampaign.FreeCampMaps();
@@ -2582,6 +2664,8 @@ void Camp_MakeInstantAction(void)
     TheCampaign.ChillTypes();
     TheCampaign.CurrentTime = 0;
     //TrashCampaignUnits();
+
+#endif
 }
 
 int ReadVersionNumber(char *saveFile)
@@ -2633,6 +2717,10 @@ void NukeHistoryFiles(void)
 
 int SaveAfterRename(char *savefile, FalconGameType gametype)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("SaveAfterRename");
+#else
+
     FILE *fp;
     char filename[MAX_PATH];
 
@@ -2677,4 +2765,6 @@ int SaveAfterRename(char *savefile, FalconGameType gametype)
 
     MonoPrint("RENAMING OF %s COMPLETED SUCCESSFULLY\n", filename);
     return 1;
+
+#endif
 }

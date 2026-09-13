@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "graphics/include/drawbsp.h"
 #include "stdhdr.h"
 #include "persist.h"
@@ -128,6 +131,10 @@ void SimPersistantClass::Init(int visualType, float X, float Y)
 // Makes this drawable
 void SimPersistantClass::Deaggregate()
 {
+#ifdef FF_HEADLESS
+    if (drawPointer) ff_headless::unsupported("persistent drawable");
+#else
+
     if (drawPointer)
         return;
 
@@ -138,15 +145,23 @@ void SimPersistantClass::Deaggregate()
     drawPointer =
         new DrawableGroundVehicle(visType, &simView, 0.0F, OTWDriver.Scale());
     OTWDriver.InsertObject(drawPointer);
+
+#endif
 }
 
 // Cleans up the drawable object
 void SimPersistantClass::Reaggregate(void)
 {
+#ifdef FF_HEADLESS
+    if (drawPointer) ff_headless::unsupported("persistent drawable");
+#else
+
     if (drawPointer)
         OTWDriver.RemoveObject(drawPointer, TRUE);
 
     drawPointer = NULL;
+
+#endif
 }
 
 void SimPersistantClass::Cleanup(void)
@@ -623,6 +638,10 @@ void AddHulk(FalconEntity* e, int hulkVisId)
 
 void UpdateNoCampaignParentObjectsWakeState(float px, float py, float range)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("detached detailed objects");
+#else
+
     // Traverse the list of asleep detached objects and wake those in range
     float dsq, rsq = range * range;
     SimBaseClass* object;
@@ -667,4 +686,6 @@ void UpdateNoCampaignParentObjectsWakeState(float px, float py, float range)
 
         object = (SimBaseClass*)dit.GetNext();
     }
+
+#endif
 }

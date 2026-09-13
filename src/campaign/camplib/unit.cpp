@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #pragma warning(disable : 4786) // debug info truncation
 
 #include <stdio.h>
@@ -1305,6 +1308,10 @@ void UnitClass::SendDeaggregateData(VuTargetEntity* target)
 
 int UnitClass::RecordCurrentState(FalconSessionEntity* session, int byReag)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::RecordCurrentState");
+#else
+
     VehicleClassDataType* vehicle_class_data;
 
     int v, have = 0, total = 0, vehleft = 0, lastPilot = -1, pilotSlot = 0;
@@ -1606,11 +1613,17 @@ int UnitClass::RecordCurrentState(FalconSessionEntity* session, int byReag)
     }
 
     return vehleft;
+
+#endif
 }
 
 
 int UnitClass::Deaggregate(FalconSessionEntity* session)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::Deaggregate");
+#else
+
     if (not IsLocal() or not IsAggregate() or IsDead())
     {
         return 0;
@@ -1846,10 +1859,16 @@ int UnitClass::Deaggregate(FalconSessionEntity* session)
     deaggregatedMap->insert(CampBaseBin(this));
 #endif
     return 1;
+
+#endif
 }
 
 int UnitClass::Reaggregate(FalconSessionEntity* session)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::Reaggregate");
+#else
+
     if (IsAggregate() or not IsLocal())
         return 0;
 
@@ -1918,10 +1937,16 @@ int UnitClass::Reaggregate(FalconSessionEntity* session)
     deaggregatedMap->remove(this->Id());
 #endif
     return 1;
+
+#endif
 }
 
 int UnitClass::TransferOwnership(FalconSessionEntity* session)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::TransferOwnership");
+#else
+
     if (IsAggregate() or not IsLocal())
     {
         return 0;
@@ -1966,10 +1991,16 @@ int UnitClass::TransferOwnership(FalconSessionEntity* session)
     }
 
     return 1;
+
+#endif
 }
 
 int UnitClass::Wake(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::Wake");
+#else
+
     // sfr: in MP, we need to run entities even if we are not inside game
 #if not NEW_WAKE
     if (not OTWDriver.IsActive())
@@ -1990,10 +2021,16 @@ int UnitClass::Wake(void)
     }
 
     return 1;
+
+#endif
 }
 
 int UnitClass::Sleep(void)
 {
+#ifdef FF_HEADLESS
+    SetAwake(0); return 1;
+#else
+
     SetAwake(0);
 
     // OTWDriver.LockObject ();
@@ -2003,12 +2040,18 @@ int UnitClass::Sleep(void)
     }
 
     return 1;
+
+#endif
 }
 
 #define VISUAL_CAMPAIGN_UNIT_MULTIPLIER 3.0F
 
 void UnitClass::InsertInSimLists(float cameraX, float cameraY)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::InsertInSimLists");
+#else
+
     float distsqu = (cameraX - XPos()) * (cameraX - XPos()) +
                     (cameraY - YPos()) * (cameraY - YPos());
     float drawdist =
@@ -2104,10 +2147,16 @@ void UnitClass::InsertInSimLists(float cameraX, float cameraY)
 
     SetInSimLists(1);
     SimDriver.AddToCampUnitList(this);
+
+#endif
 }
 
 void UnitClass::RemoveFromSimLists(void)
 {
+#ifdef FF_HEADLESS
+    SetInSimLists(0);
+#else
+
     // remove drawable from drawing
     if (draw_pointer)
     {
@@ -2120,11 +2169,17 @@ void UnitClass::RemoveFromSimLists(void)
 
     SetInSimLists(0);
     SimDriver.RemoveFromCampUnitList(this);
+
+#endif
 }
 
 //sfr: changed this proto
 void UnitClass::DeaggregateFromData(VU_BYTE* data, long size)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::DeaggregateFromData");
+#else
+
     if (IsLocal() or not IsAggregate())
     {
         return;
@@ -2338,11 +2393,17 @@ void UnitClass::DeaggregateFromData(VU_BYTE* data, long size)
 #else
     deaggregatedMap->insert(CampBaseBin(this));
 #endif
+
+#endif
 }
 
 //void UnitClass::ReaggregateFromData (int size, uchar* data)
 void UnitClass::ReaggregateFromData(VU_BYTE* data, long size)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::ReaggregateFromData");
+#else
+
     if (IsLocal() or IsAggregate())
         return;
 
@@ -2376,11 +2437,17 @@ void UnitClass::ReaggregateFromData(VU_BYTE* data, long size)
 #else
     deaggregatedMap->remove(this->Id());
 #endif
+
+#endif
 }
 
 //void UnitClass::TransferOwnershipFromData (int size, uchar* data)
 void UnitClass::TransferOwnershipFromData(VU_BYTE* data, long size)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("UnitClass::TransferOwnershipFromData");
+#else
+
     if (IsAggregate() or IsLocal() or not data)
         return;
 
@@ -2424,6 +2491,8 @@ void UnitClass::TransferOwnershipFromData(VU_BYTE* data, long size)
     }
 
     return;
+
+#endif
 }
 
 int UnitClass::ResetPlayerStatus(void)

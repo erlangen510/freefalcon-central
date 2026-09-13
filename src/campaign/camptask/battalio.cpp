@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <stdio.h>
 #include <conio.h>
 #include <stddef.h>
@@ -1891,6 +1894,10 @@ int BattalionClass::StepRadar(
 
 int BattalionClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("BattalionClass::GetVehicleDeagData");
+#else
+
     static CampEntity ent;
     static int round;
     int i;
@@ -2020,6 +2027,8 @@ int BattalionClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
 
     simdata->playerSlot = NO_PILOT;
     return MOTION_GND_AI;
+
+#endif
 }
 
 int BattalionClass::GetUnitElement(void)

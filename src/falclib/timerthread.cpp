@@ -112,7 +112,11 @@ void SetTimeCompression(int newComp)
         lastStartTime = vuxRealTime;
 
         if (not gameCompressionRatio and newComp)
+            { /* No detailed simulator clock in headless mode. */
+#ifndef FF_HEADLESS
             SimDriver.lastRealTime = vuxGameTime;
+#endif
+            }
 
         gameCompressionRatio = newComp;
         targetCompressionRatio = newComp;
@@ -144,7 +148,11 @@ void SetOnlineTimeCompression(int newComp)
     lastStartTime = vuxRealTime;
 
     if (not gameCompressionRatio and newComp)
+        { /* No detailed simulator clock in headless mode. */
+#ifndef FF_HEADLESS
         SimDriver.lastRealTime = vuxGameTime;
+#endif
+        }
 
     gameCompressionRatio = newComp;
     targetCompressionRatio = newComp;
@@ -163,7 +171,11 @@ void SetTemporaryCompression(int newComp)
     lastStartTime = vuxRealTime;
 
     if (not gameCompressionRatio and newComp)
+        { /* No detailed simulator clock in headless mode. */
+#ifndef FF_HEADLESS
         SimDriver.lastRealTime = vuxGameTime;
+#endif
+        }
 
     gameCompressionRatio = newComp;
 }
@@ -182,7 +194,11 @@ void SetTime(unsigned long currentTime)
     SimLibFrameElapsed = (float)currentTime;
     SimLibElapsedTime = currentTime;
     UPDATE_SIM_ELAPSED_SECONDS; // COBRA - RED - Scale Elapsed Seconds
+    { /* No detailed simulator clock in headless mode. */
+#ifndef FF_HEADLESS
     SimDriver.lastRealTime = currentTime;
+#endif
+    }
 
     // ShiAssert
     // (

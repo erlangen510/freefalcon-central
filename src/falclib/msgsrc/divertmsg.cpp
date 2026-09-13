@@ -400,8 +400,12 @@ void PlayDivertRadioCalls(CampEntity target, int mission, Flight flight,
     }
 
     // This is the flight saying that they're diverting (should be delayed a little..)
+#ifdef FF_HEADLESS
+    if (false)
+#else
     if (SimDriver.GetPlayerEntity() and
         flight->GetComponentLead() not_eq SimDriver.GetPlayerEntity())
+#endif
     {
         msg = CreateCallToAWACS(flight, rcAWACSDIVERT, to);
         msg->dataBlock.edata[0] = msg->dataBlock.edata[2];

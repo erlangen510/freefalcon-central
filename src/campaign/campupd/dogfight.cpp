@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "stdhdr.h"
 #include "dogfight.h"
 #include "initdata.h"
@@ -529,6 +532,10 @@ void DogfightClass::SaveSettings(char *filename)
 
 void DogfightClass::UpdateDogfight(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::UpdateDogfight");
+#else
+
     if (vuxRealTime > lastUpdateTime + VU_TICS_PER_SECOND)
     {
         // Check for new players
@@ -667,6 +674,8 @@ void DogfightClass::UpdateDogfight(void)
             action_cam_started = FALSE;
         }
     }
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -675,6 +684,10 @@ void DogfightClass::UpdateDogfight(void)
 
 void DogfightClass::UpdateGameStatus(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::UpdateGameStatus");
+#else
+
     VuSessionsIterator sessionWalker(FalconLocalGame);
     FalconSessionEntity *session;
     DogfightStatus newStatus = dog_Waiting;
@@ -697,6 +710,8 @@ void DogfightClass::UpdateGameStatus(void)
     }
 
     gameStatus = newStatus;
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -705,6 +720,10 @@ void DogfightClass::UpdateGameStatus(void)
 
 void DogfightClass::RegenerateAircraft(AircraftClass *aircraft)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::RegenerateAircraft");
+#else
+
     // Queue the aircraft for eventual regeneration
     if (not aircraft)
         return;
@@ -729,6 +748,8 @@ void DogfightClass::RegenerateAircraft(AircraftClass *aircraft)
     {
         regenerationQueue->ForcedInsert(aircraft);
     }
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -799,6 +820,10 @@ int DogfightClass::GameOver(void)
 
 int DogfightClass::CheckRoundOver(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("dogfight simulation");
+#else
+
     SimBaseClass *theObject;
     int activeAC[MAX_DOGFIGHT_TEAMS] = {0}, activeTeams = 0, team, lastTeam = 0;
     CampEntity campEntity;
@@ -827,6 +852,8 @@ int DogfightClass::CheckRoundOver(void)
     }
 
     return activeTeams;
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -835,6 +862,10 @@ int DogfightClass::CheckRoundOver(void)
 
 void DogfightClass::RoundOver(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::RoundOver");
+#else
+
     SimBaseClass *theObject;
     int activeAC[MAX_DOGFIGHT_TEAMS] = {0}, activeTeams = 0, team, lastTeam = 0;
     CampEntity campEntity;
@@ -877,6 +908,8 @@ void DogfightClass::RoundOver(void)
     {
         MonoPrint("Draw\n");
     }
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -885,6 +918,10 @@ void DogfightClass::RoundOver(void)
 
 void DogfightClass::EndGame(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::EndGame");
+#else
+
     if (regenerationQueue)
     {
         regenerationQueue->Purge();
@@ -896,6 +933,8 @@ void DogfightClass::EndGame(void)
     localGameStatus = gameStatus = dog_Waiting;
     flags or_eq DF_GAME_OVER;
     FalconLocalSession->SetFlyState(FLYSTATE_IN_UI);
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -904,6 +943,10 @@ void DogfightClass::EndGame(void)
 
 void DogfightClass::RestartGame(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::RestartGame");
+#else
+
     MonoPrint("Restarting Game\n");
     // Reset game and mission evaluator after everyone has returned to the UI and viewed their scores
     flags and_eq compl DF_GAME_OVER;
@@ -921,6 +964,8 @@ void DogfightClass::RestartGame(void)
     {
         SendSettings(NULL);
     }
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -930,6 +975,10 @@ void DogfightClass::RestartGame(void)
 
 void DogfightClass::EndRound(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::EndRound");
+#else
+
     SimBaseClass *theObject;
 
     {
@@ -947,6 +996,8 @@ void DogfightClass::EndRound(void)
     localGameStatus = dog_Starting;
     FalconLocalSession->SetFlyState(FLYSTATE_DEAD);
     GameManager.LockPlayer(FalconLocalSession);
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -956,8 +1007,14 @@ void DogfightClass::EndRound(void)
 
 void DogfightClass::ResetRound(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::ResetRound");
+#else
+
     // localGameStatus = gameStatus = dog_Starting;
     RegenerateAvailableAircraft();
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -974,6 +1031,10 @@ int gLastRegenCount = 0;
 
 void DogfightClass::RegenerateAvailableAircraft(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("DogfightClass::RegenerateAvailableAircraft");
+#else
+
     if (regenerationQueue)
     {
         SimBaseClass *theObject;
@@ -1035,6 +1096,8 @@ void DogfightClass::RegenerateAvailableAircraft(void)
             }
         }
     }
+
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////

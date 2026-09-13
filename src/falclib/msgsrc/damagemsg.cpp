@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "msginc/damagemsg.h"
 #include "msginc/campweaponfiremsg.h"
 #include "mesg.h"
@@ -121,6 +124,10 @@ FalconDamageMessage* CreateGroundCollisionMessage(SimVehicleClass* vehicle,
                                                   int damage,
                                                   VuTargetEntity* target)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("CreateGroundCollisionMessage");
+#else
+
     ShiAssert(vehicle);
 
     if (FalconLocalSession and vehicle == FalconLocalSession->GetPlayerEntity())
@@ -183,4 +190,6 @@ FalconDamageMessage* CreateGroundCollisionMessage(SimVehicleClass* vehicle,
     message->RequestOutOfBandTransmit();
 
     return message;
+
+#endif
 }

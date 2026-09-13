@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include <string.h>
 #include "f4vu.h"
 #include "classtbl.h"
@@ -347,12 +350,20 @@ int FalconEntity::EncodeDirty(unsigned char** stream)
 
     if (dirty_classes bitand DIRTY_SIM_BASE)
     {
+        #ifdef FF_HEADLESS
+        ff_headless::unsupported("detailed entity dirty data");
+#else
         ((SimBaseClass*)this)->WriteDirty(stream);
+#endif
     }
 
     if (dirty_classes bitand DIRTY_AIRCRAFT)
     {
+        #ifdef FF_HEADLESS
+        ff_headless::unsupported("detailed entity dirty data");
+#else
         ((AircraftClass*)this)->WriteDirty(stream);
+#endif
     }
 
     return *stream - start;
@@ -423,12 +434,20 @@ void FalconEntity::DecodeDirty(unsigned char** stream, long* rem)
 
     if (bits bitand DIRTY_SIM_BASE)
     {
+        #ifdef FF_HEADLESS
+        ff_headless::unsupported("detailed entity dirty data");
+#else
         ((SimBaseClass*)this)->ReadDirty(stream, rem);
+#endif
     }
 
     if (bits bitand DIRTY_AIRCRAFT)
     {
+        #ifdef FF_HEADLESS
+        ff_headless::unsupported("detailed entity dirty data");
+#else
         ((AircraftClass*)this)->ReadDirty(stream, rem);
+#endif
     }
 }
 

@@ -1,57 +1,85 @@
-# Headless campaign host: first stage
+# Offline campaign host
 
-**Implemented:** a console executable that reads real `.cam` files, validates
-container boundaries, decompresses the campaign/unit/objective/objective-delta
-sections, and prints saved metadata as JSON. The checked decoder uses the same
-format as FreeFalcon's native LZSS compressor, with source/output bounds and
-dictionary-reference checks.
+`ff-campaign run` executes the native aggregate FreeFalcon campaign engine in a
+console process. It initializes real class tables, VU entities and team managers,
+loads a campaign, runs initial planning, then advances in five-second steps using
+`DoCampaignLoop`, `UpdateRealUnits` and both VU queues. No graphics or audio device
+is created. ATM/GTM/NTM, movement, aggregate combat, supply and triggers remain
+native model operations.
 
-**Not implemented:** VU entity instantiation, complete world initialization,
-campaign stepping, AI/mission execution, combat, logistics, network API or resets.
-This is the data-loading stage of the host, not a working campaign simulator.
-`run` returns exit code 3 and `simulation_advanced: false`; it does not pretend
-to advance the game by incrementing a standalone clock.
+## Build
 
-## Build and test
+Windows x64, CMake 3.21+, Visual Studio C++ and ATL are required for execution.
+The tested toolchain is VS 2022/v143 with Windows SDK 10.0.26100.0.
+From the repository root:
 
-From this repository's root (CMake 3.21+, C++17 compiler):
-
-```sh
-cmake -S src/headless -B build/headless
+```powershell
+cmake -S src/headless -B build/headless -A x64 -DFF_BUILD_CAMPAIGN_ENGINE=ON
 cmake --build build/headless --config Release
 ctest --test-dir build/headless -C Release --output-on-failure
 ```
 
-Windows uses a console `wmain` entry point so Korean/Unicode paths work. No ATL,
-DirectX, graphics device, sound device, UI or installed game is needed for the
-default target. Supply a scenario file explicitly; no registry lookup is used.
+For extracted ATL, pass `FF_ATL_INCLUDE` and `FF_ATL_LIB`. Set
+`FF_BUILD_CAMPAIGN_ENGINE=OFF` for the C++17 inspector without Windows/ATL.
+`FF_BUILD_DEBUG_RUNNER=ON` builds an optional Windows exception investigation tool.
+
+## Run
 
 ```powershell
-.\build\headless\Release\ff-campaign.exe inspect C:\FreeFalcon6\campaign\SAVE\save0.cam
+.\build\headless\Release\ff-campaign.exe run C:\FF6Data save0 60 1
+.\build\headless\Release\ff-campaign.exe inspect C:\FF6Data\campaign\SAVE\save0.cam
 ```
 
-Exit codes: 0 = inspection succeeded, 1 = invalid/missing scenario, 2 = invalid
-CLI usage, 3 = campaign execution not yet implemented. A successful inspection
-does not certify all unit records, external theater dependencies or model behavior.
-Only the metadata prefix layouts for format versions 73 and 99 are accepted.
-Version 99 was exercised using the FF6 files linked by the upstream build guide.
-`recorded_unit_count` and `recorded_objective_count` are save-header counts,
-not counts of instantiated entities. Saved title strings can be placeholders.
+`run <data-root> <scenario-basename> <minutes> [seed]` accepts 1?10080 minutes
+and a 32-bit unsigned initial seed (default 1). Only the three FF6 Korea
+format-99 scenarios have been exercised so far. The data root must contain:
 
-## Legacy engine investigation
+- `campaign/SAVE`: scenarios and their companion files, Korea terrain/names,
+  Falcon4.AII/TT, priorities, strings and other campaign support files.
+- `terrdata/objects`: native Falcon4 class tables and associated object data.
+- `terrdata/korea/terrain/Theater.map` and `Theater.MEA`: coarse elevation data.
+- `sim/MISDATA`, `sim/RADAR`, and other sim data extracted from the shipped
+  `Zips/Simdata.zip` into the data root. Leaving only the ZIP is insufficient.
 
-`-DFF_BUILD_ENGINE_PROBE=ON` additionally builds the actual campaign, campaign UI
-support, VU, Falcon common and list libraries. This optional MSVC-only link probe
-is intentionally unfinished and currently fails to link. It retains references
-to the real `DoCampaignLoop` without calling it on uninitialized data.
-Optional extracted ATL paths can be provided as `FF_ATL_INCLUDE` and `FF_ATL_LIB`.
+Game data is not shipped. The local parent workspace already has the extracted
+FF6 installer data; the installer itself does not need to run. Missing required
+files and invalid campaign archive bounds are checked before engine startup.
 
-The latest probe leaves 324 unresolved references, including presentation,
-detailed simulation and application-owned state. That count depends on the
-exact link command and is not a count of engine defects. No fake implementations
-were introduced to silence those errors. The normal inspection executable has
-no link dependency on this unfinished target.
+Success is exit code 0 and a final JSON report on stdout; diagnostics are on
+stderr. Invalid input/runtime errors use exit 1, usage errors exit 2, and an
+inspector-only build returns exit 3 for `run`.
 
-The next step is an explicit host bootstrap retaining the required VU/Falcon
-services, with presentation dependencies isolated and a bounded tick operation
-driving the real campaign loop and event queue.
+## Report and interpretation
+
+The report includes campaign times, completed steps, active unit/objective counts,
+new flights, units whose grid location/strength/supply/orders changed, native combat
+message counts and reported losses. Units are sampled after every step; all must
+remain aggregate. Active-list counts exclude inactive units in save headers.
+`reported_combat_losses` combines losses reported by native unit/feature damage
+processing; it is not an aircraft-loss statistic. Execution does not validate
+historical accuracy, balance, or victory outcomes.
+
+## Boundaries
+
+- `engine_host.cpp` owns process startup and stepping. The process exits after one
+  run. Global state is not reset in-process, and save/resume is not yet exposed.
+- Native history working files go into the supplied campaign/save directory.
+  Concurrent runs require separate data copies. Initial seed is exposed, but
+  deterministic replay is not yet guaranteed.
+- The offline session has the native default player country for initiative
+  calculations, with no player aircraft. Player-side assumptions remain in the model.
+- `FF_HEADLESS` excludes UI, online and detailed aircraft/sim transitions. Unsupported
+  simulation paths throw explicit errors; presentation-only callbacks have no renderer.
+- `terrain.cpp` reads the native MEA header/table and preserves axis conversion and
+  vertical flip. `presentation.cpp` retains scalar weather conditions used by the
+  native `WeatherClass`; drawable clouds and textures are absent.
+- `model_support.cpp` contains native waypoint timing/airspeed, geometry, entity
+  comparison and radar-table loading routines extracted from their UI/sim files.
+  FF6's radar list declares 170 names but contains 169. Its final slot explicitly
+  reuses the preceding radar, matching the original reader's reuse behavior.
+- Legacy runtime paths use the Windows ANSI code page, must fit MAX_PATH and must
+  not contain `%`. Inspection itself uses Unicode filesystem paths.
+
+The parent workspace provides `scripts/verify-campaigns.py`: three one-hour runs,
+a six-hour run, and malformed-request/missing-data rejection checks. Its measured
+checkpoint is `headless-validation/PROGRESS.md` in the parent repository.
