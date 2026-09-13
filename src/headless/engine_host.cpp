@@ -24,6 +24,8 @@
 #include <map>
 #include <set>
 #include <fstream>
+#include <memory>
+#include "watch.h"
 
 struct UnitState { short x, y; int vehicles, supply, orders; bool flight, local; };
 using UnitStates = std::map<unsigned long long, UnitState>;
@@ -93,13 +95,16 @@ static void validateData(const std::filesystem::path& data) {
 
 int RunLegacyCampaign(const std::vector<std::string>& args) {
     unsigned completedSteps = 0;
+    std::unique_ptr<CampaignWatch> watch;
     try {
         if (args.size() != 5 && args.size() != 6) { std::cerr << "{\"status\":\"error\",\"simulation_advanced\":false,\"error\":\"Usage: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\"}\n"; return 2; }
         const auto data = std::filesystem::absolute(std::filesystem::u8path(args[2]));
+        const bool interactive = args[1] == "watch";
+        if (interactive) watch = std::make_unique<CampaignWatch>(std::filesystem::absolute(std::filesystem::u8path(args[4])));
         const auto wallStart = std::chrono::steady_clock::now();
         size_t parsed = 0;
-        const int minutes = std::stoi(args[4], &parsed);
-        if (parsed != args[4].size()) throw std::runtime_error("Invalid duration");
+        const int minutes = interactive ? 10080 : std::stoi(args[4], &parsed);
+        if (!interactive && parsed != args[4].size()) throw std::runtime_error("Invalid duration");
         unsigned seed = 1;
         if (args.size() == 6) {
             const auto value = std::stoull(args[5], &parsed);
@@ -113,6 +118,10 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         if (strspn(scenario, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != strlen(scenario)) throw std::runtime_error("Use a scenario basename, such as save0");
         const auto inspected = ff::headless::InspectScenario(data / "campaign/SAVE" / (std::string(scenario) + ".cam"));
         validateData(data);
+        // Native history files share this data root. The handle lives until exit.
+        HANDLE dataLock = CreateFileW((data / ".headless.lock").c_str(), GENERIC_READ | GENERIC_WRITE,
+            0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (dataLock == INVALID_HANDLE_VALUE) throw std::runtime_error("Data root is in use by another campaign process");
         setPath(FalconDataDirectory, data);
         setPath(FalconCampaignSaveDirectory, data / "campaign/SAVE");
         setPath(FalconCampUserSaveDirectory, data / "campaign/SAVE");
@@ -159,7 +168,9 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         std::set<unsigned long long> moved, createdFlights, strengthChanged, supplyChanged, ordersChanged;
         stage("startup campaign planning");
         DoCampaignLoop(1);
+        if (watch) watch->initialize(scenario);
         for (int second = 0; second < minutes * 60; second += 5) {
+            if (watch && !watch->waitForStep()) break;
             SetTime(TheCampaign.CurrentTime + 5 * CampaignSeconds);
             DoCampaignLoop(0);
             UpdateRealUnits(5 * CampaignSeconds);
@@ -177,9 +188,10 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
             previous = current;
             ++completedSteps;
         }
+        if (watch) watch->publish("stopped");
         int local = 0, flights = 0;
         for (const auto& [id, state] : previous) { local += state.local; flights += state.flight; }
-        std::cout << "{\"status\":\"ok\",\"simulation_advanced\":true,\"start_ms\":" << start
+        std::cout << "{\"status\":\"ok\",\"simulation_advanced\":" << (completedSteps ? "true" : "false") << ",\"start_ms\":" << start
                   << ",\"end_ms\":" << TheCampaign.CurrentTime
                   << ",\"scenario\":" << ff::headless::JsonString(scenario)
                   << ",\"seed\":" << seed << ",\"format_version\":" << inspected.version
@@ -199,6 +211,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         std::cout.flush(); std::cerr.flush();
         std::_Exit(0);
     } catch (const std::exception& error) {
+        if (watch) { try { watch->error(error.what()); } catch (...) {} }
         std::cerr << "{\"status\":\"error\",\"simulation_advanced\":" << (completedSteps ? "true" : "false")
                   << ",\"completed_steps\":" << completedSteps << ",\"error\":" << ff::headless::JsonString(error.what()) << "}" << std::endl;
         std::_Exit(1);

@@ -10,10 +10,11 @@ int Run(const std::vector<std::string>& args) {
     if (args.size() == 2 && args[1] == "--help") {
         std::cout << "Usage: ff-campaign inspect <scenario.cam>\n"
                      "Validates archive boundaries, metadata and compressed sections.\n"
-                     "Run: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\n";
+                     "Run: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\n"
+                     "Watch: ff-campaign watch <data-root> <scenario-name> <session-directory> [seed]\n";
         return 0;
     }
-    if (args.size() >= 2 && args[1] == "run") {
+    if (args.size() >= 2 && (args[1] == "run" || args[1] == "watch")) {
 #ifdef FF_CAMPAIGN_ENGINE
         return RunLegacyCampaign(args);
 #else

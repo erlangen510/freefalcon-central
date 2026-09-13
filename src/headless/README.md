@@ -83,3 +83,36 @@ historical accuracy, balance, or victory outcomes.
 The parent workspace provides `scripts/verify-campaigns.py`: three one-hour runs,
 a six-hour run, and malformed-request/missing-data rejection checks. Its measured
 checkpoint is `headless-validation/PROGRESS.md` in the parent repository.
+
+## Interactive observer host
+
+`ff-campaign watch <data-root> <scenario> <session-directory> [seed]` runs the same
+native aggregate campaign with wall-clock pacing and external pause/step controls.
+Initial planning runs before the first paused snapshot. Rates are 1, 5, 20 and 100
+campaign seconds per wall second; native steps remain five campaign seconds.
+
+The host exports `catalog.json` (teams, vehicles, weapons, objectives/features),
+`terrain.bin` (native cover/relief/road/rail cells) and `state.json` (latest dynamic
+state, loadouts, routes, damage and control acknowledgement). JSON and terrain
+replacement is atomic. Snapshots are published about every 500 ms, on the campaign
+thread. Existing metadata is not intended for reuse across sessions or scenarios.
+
+Write `control.txt` atomically as five whitespace-separated integers:
+`sequence speed paused cumulative_steps stop`. Sequence must increase, speed must
+be 1/5/20/100, paused/stop are 0/1, and cumulative_steps cannot decrease or jump by
+more than 100. Each new step request is consumed once while paused. Steps queued
+while running are discarded. Send a new sequence heartbeat every two seconds;
+the process stops after 20 seconds without a valid new command. It also stops at
+the existing seven-day run limit. Logs/final JSON are redirected into the session.
+
+`watch.cpp` reads existing loadout records directly. It avoids the random-consuming
+`GetUnitWeaponCount` getter. Default vehicle weapons are catalog data, not current
+ammunition. Supply/morale getters are only meaningful for implementing subclasses.
+Feature offsets use the native east/north ordering; feature status values are
+0 normal, 1 repaired, 2 damaged, 3 destroyed. Model fidelity and deterministic
+replay limitations of batch mode continue to apply.
+
+Both `run` and `watch` hold an exclusive `.headless.lock` handle in the data root
+to prevent competing history-file writers. The handle is released on process exit.
+Use separate data copies for concurrent campaigns. The parent workspace contains
+the Godot observer, launcher and real-data protocol/UI integration checks.

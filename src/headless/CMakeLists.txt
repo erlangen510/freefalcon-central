@@ -66,7 +66,7 @@ engine_library(ff_lists codelib/tools/lists/lists.vcxproj)
 engine_library(ff_campui campaign/campui/campui.vcxproj)
 engine_library(ff_comms comms/comms.vcxproj)
 add_library(ff_campaign_engine STATIC engine_host.cpp ${FF_ROOT}/ui/src/f4config.cpp ${FF_ROOT}/utils/lzss.cpp ${FF_ROOT}/tools/isbad/isbad.cpp ${FF_ROOT}/extlibs/tinyxml2/tinyxml2.cpp)
-target_sources(ff_campaign_engine PRIVATE presentation.cpp model_support.cpp terrain.cpp
+target_sources(ff_campaign_engine PRIVATE presentation.cpp model_support.cpp terrain.cpp watch.cpp
   ${FF_ROOT}/falcsnd/voicemapper.cpp
   ${FF_ROOT}/sim/navaids/tacan.cpp
   ${FF_ROOT}/sim/missile/readin.cpp
