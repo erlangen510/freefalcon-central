@@ -12,6 +12,11 @@
 
 void MissileClass::UpdateTargetData(void)
 {
+#ifdef FF_HEADLESS
+    static unsigned launchObservations=0;
+    if(GetWCD()->HitChance[Naval]>0 && launchObservations++<16)
+        fprintf(stderr,"[naval-seeker-phase] time=%.3f state=%d delay=%.3f target=%lu sensor=%d\n",runTime,int(launchState),inputData->guidanceDelay,targetPtr?targetPtr->BaseData()->Id().num_:0,sensorArray && sensorArray[0]?int(sensorArray[0]->Type()):-1);
+#endif
     // Don't come here without a sensor
     ShiAssert(sensorArray[0]);
 

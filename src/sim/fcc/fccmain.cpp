@@ -1220,6 +1220,10 @@ void FireControlComputer::SetTarget(SimObjectType* newTarget)
 
 void FireControlComputer::DisplayInit(ImageBuffer* image)
 {
+#ifdef FF_HEADLESS
+// Cockpit display is not instantiated by the headless AI runtime.
+#else
+
     DisplayExit();
 
     privateDisplay = new Render2D;
@@ -1230,10 +1234,16 @@ void FireControlComputer::DisplayInit(ImageBuffer* image)
     else
         privateDisplay->SetColor(
             0xffffffff); // #2: FCR (right MFD) was green -> white (realism, per request 2026-06-17)
+
+#endif
 }
 
 void FireControlComputer::Display(VirtualDisplay* newDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit display is not instantiated by the headless AI runtime.
+#else
+
     display = newDisplay;
 
     // JPO intercept for now FCC power...
@@ -1249,10 +1259,16 @@ void FireControlComputer::Display(VirtualDisplay* newDisplay)
     }
 
     NavDisplay();
+
+#endif
 }
 
 void FireControlComputer::PushButton(int whichButton, int whichMFD)
 {
+#ifdef FF_HEADLESS
+// Cockpit display is not instantiated by the headless AI runtime.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
     ShiAssert(whichButton < 20);
     ShiAssert(whichMFD < 4);
@@ -1382,6 +1398,8 @@ void FireControlComputer::PushButton(int whichButton, int whichMFD)
 
         break;
     }
+
+#endif
 }
 
 // STUFF Copied from Harm - now merged. JPO

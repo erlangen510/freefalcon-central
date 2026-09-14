@@ -1220,6 +1220,10 @@ void RadarDopplerClass::SetGMScan(void)
 
 void RadarDopplerClass::GMDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     //START_PROFILE("GMDISPLAY");
     Tpoint center;
     int i = 0;
@@ -2078,6 +2082,8 @@ void RadarDopplerClass::GMDisplay(void)
     }
 
     //STOP_PROFILE("GMDISPLAY");
+
+#endif
 }
 
 

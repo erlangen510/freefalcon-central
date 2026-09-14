@@ -59,7 +59,11 @@ float HeliBrain::AutoTrack(float)
         desSpeed = 0.0f;
 
     LevelTurn(rollLoad, rollDir, TRUE);
-    MachHold(desSpeed, self->GetWPalt(), TRUE);
+    // Track the requested world-space point, including its altitude. The
+    // original AltitudeHold(trackZ) path used this height, not the route's.
+    const float groundZ = OTWDriver.GetGroundLevel(self->XPos() + self->XDelta(),
+                                                  self->YPos() + self->YDelta());
+    MachHold(desSpeed, groundZ - trackZ, TRUE);
     //MachHold(desSpeed, 300.0f, TRUE);
 
     return (0.0f);
@@ -69,6 +73,8 @@ float HeliBrain::AutoTrack(float)
 // altSet is alltitude above ground -> positive value
 void HeliBrain::MachHold(float speedSet, float altSet, int groundAvoid)
 {
+    commandedAltitudeAGL = altSet;
+    hasAltitudeCommand = true;
     float altGround;
     float altOffset;
     float altAct;

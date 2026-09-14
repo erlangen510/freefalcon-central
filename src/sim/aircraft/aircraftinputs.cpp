@@ -265,7 +265,7 @@ void AircraftClass::GatherInputs(void)
             // Use the brain's target...
             SetTarget(theBrain->targetPtr);
 
-            if (theBrain->IsSetFlag(BaseBrain::MslFireFlag))
+            if (not DBrain()->IsOperatorWeaponsHold() and theBrain->IsSetFlag(BaseBrain::MslFireFlag))
             {
                 FCC->releaseConsent = TRUE;
             }
@@ -274,7 +274,7 @@ void AircraftClass::GatherInputs(void)
                 FCC->releaseConsent = FALSE;
             }
 
-            fireGun = theBrain->IsSetFlag(BaseBrain::GunFireFlag);
+            fireGun = not DBrain()->IsOperatorWeaponsHold() and theBrain->IsSetFlag(BaseBrain::GunFireFlag);
         }
 
         if (this == FalconLocalSession->GetPlayerEntity())

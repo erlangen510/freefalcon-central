@@ -40,7 +40,8 @@ int SMSClass::DropBomb(int allowRipple)
 
 
     // Check for SMS Failure or other reason not to drop
-    if (not CurStationOK() or //Weapon Station failure
+    if ((ownship->IsAirplane() and static_cast<AircraftClass*>(ownship)->DBrain()->IsOperatorWeaponsHold()) or
+        not CurStationOK() or //Weapon Station failure
         ownship->OnGround() or // Weight on wheels inhibit
         not curWeapon or // No Weapon
         ownship->GetNz() < 0.0F or // Negative Gs

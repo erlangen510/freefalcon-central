@@ -11,6 +11,9 @@
 #include "rviewpnt.h"
 #include "renderow.h"
 #include "drawgrnd.h"
+#ifdef FF_HEADLESS
+#include "otwdrive.h"
+#endif
 
 #ifdef USE_SH_POOLS
 MEM_POOL DrawableGroundVehicle::pool;
@@ -31,11 +34,13 @@ DrawableGroundVehicle::DrawableGroundVehicle(int ID, Tpoint *pos, float heading,
     // Initialize our position and orientation values
     Update(pos, heading);
 
+    #ifndef FF_HEADLESS
     // insure our z position is initialized
     position.z = pos->z;
 
     // insure orientation has default value
     orientation = IMatrix;
+    #endif
 }
 
 
@@ -67,6 +72,53 @@ void DrawableGroundVehicle::Update(Tpoint *pos, float heading)
 
     // Force a reevaluation of the terrain elevation and orientation
     previousLOD = -1;
+#ifdef FF_HEADLESS
+    // Native terrain alignment must run without waiting for a renderer Draw call.
+        Tpoint normal;
+        float s;
+        float Nx, Ny, Nz;
+        float x, y, z;
+
+        if (drivingOn)
+        {
+            // Get the normal and update our height to conform to the platform we're driving on
+            // COBRA - RED - Little Offset to avoid ZBuffering conflicts
+            position.z =
+                drivingOn->GetGroundLevel(position.x, position.y, &normal) -
+                .1f;
+        }
+        else
+        {
+            // Get the normal and update our height to reflect the terrain beneath us
+            // COBRA - RED - Little Offset to avoid ZBuffering conflict
+            position.z = OTWDriver.GetGroundLevel(
+                             position.x, position.y, &normal) -
+                         .1f;
+        }
+
+        previousLOD = 0;
+
+        // Construct the rotation matrix to orient the object correctly
+        // The "old" axes are those of a pure rotation about Z (for heading).
+        // The "new" axes include the alignment of "up" with the terrain normal.
+        // New Z axis (Inverted Terrain Normal)
+        Nx = -normal.x, Ny = -normal.y, Nz = -normal.z;
+        s = 1.0f / (float)sqrt(Nx * Nx + Ny * Ny + Nz * Nz);
+        orientation.M13 = Nx * s, orientation.M23 = Ny * s,
+        orientation.M33 = Nz * s;
+
+        // New X axis (New Z axis cross negative old Y axis)
+        x = Nz * cosYaw, y = Nz * sinYaw, z = -Nx * cosYaw - Ny * sinYaw;
+        s = 1.0f / (float)sqrt(x * x + y * y + z * z);
+        orientation.M11 = x * s, orientation.M21 = y * s,
+        orientation.M31 = z * s;
+
+        // New Y axis (New Z axis cross old X axis)
+        x = -Nz * sinYaw, y = Nz * cosYaw, z = Nx * sinYaw - Ny * cosYaw;
+        s = 1.0f / (float)sqrt(x * x + y * y + z * z);
+        orientation.M12 = x * s, orientation.M22 = y * s,
+        orientation.M32 = z * s;
+#endif
 }
 
 
@@ -75,6 +127,10 @@ void DrawableGroundVehicle::Update(Tpoint *pos, float heading)
 \***************************************************************************/
 void DrawableGroundVehicle::Draw(class RenderOTW *renderer, int LOD)
 {
+#ifdef FF_HEADLESS
+    // External observer owns rendering. Native geometry/attachment data remains live.
+#else
+
     // See if we need to update our ground position
     if (LOD not_eq previousLOD)
     {
@@ -127,4 +183,6 @@ void DrawableGroundVehicle::Draw(class RenderOTW *renderer, int LOD)
 
     // Tell our parent class to draw us now
     DrawableBSP::Draw(renderer, LOD);
+
+#endif
 }

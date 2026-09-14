@@ -1236,6 +1236,10 @@ int AircraftClass::CreateDamageF16Piece(DamageF16PieceStructure *piece,
 
 void AircraftClass::SetupDamageF16Effects(DamageF16PieceStructure *piece)
 {
+#ifdef FF_HEADLESS
+// Visual debris only; vehicle destruction and damage remain in RunExplosion/ApplyDamage.
+#else
+
     Tpoint slot;
     Tpoint piececenter;
     piececenter.x = XPos();
@@ -1305,6 +1309,8 @@ void AircraftClass::SetupDamageF16Effects(DamageF16PieceStructure *piece)
     OTWDriver.AddSfxRequest(new SfxClass(
         piece->sfxtype, piece->sfxflag, tmpSimBase, piece->lifetime,
         OTWDriver.Scale(), &slot, piece->pitch, piece->roll));
+
+#endif
 }
 
 int AircraftClass::CreateDamageF16Effects()

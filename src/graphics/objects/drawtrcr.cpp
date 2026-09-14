@@ -107,6 +107,10 @@ void DrawableTracer::Update(Tpoint *head, Tpoint *tail)
 //void DrawableTracer::Draw( class RenderOTW *renderer, int LOD )
 void DrawableTracer::Draw(class RenderOTW *renderer, int)
 {
+#ifdef FF_HEADLESS
+    // External visualization only.
+#else
+
     ThreeDVertex v0, v1, v2, v3, v4, v5;
     Tpoint cpos, cend;
     int lineColor;
@@ -388,6 +392,8 @@ void DrawableTracer::Draw(class RenderOTW *renderer, int)
     // Draw the polygon
     renderer->DrawSquare(&v1, &v5, &v2, &v0, CULL_ALLOW_ALL);
     renderer->DrawSquare(&v1, &v4, &v3, &v0, CULL_ALLOW_ALL);
+
+#endif
 }
 
 
@@ -402,6 +408,10 @@ BOOL DrawableTracer::ConstructWidth(RenderOTW *renderer, Tpoint *start,
                                     ThreeDVertex *xformLefte,
                                     ThreeDVertex *xformRighte)
 {
+#ifdef FF_HEADLESS
+    return FALSE; // No screen-space tracer geometry.
+#else
+
     Tpoint left, right, wloc;
     Tpoint UP;
     float dx, dy, dz;
@@ -503,4 +513,6 @@ BOOL DrawableTracer::ConstructWidth(RenderOTW *renderer, Tpoint *start,
     renderer->TransformCameraCentricPoint(&right, xformRighte);
 
     return TRUE;
+
+#endif
 }

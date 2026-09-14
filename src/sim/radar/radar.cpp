@@ -158,7 +158,23 @@ void RadarClass::SetEmitting(BOOL state)
 
 void RadarClass::SetDesiredTarget(SimObjectType* newTarget)
 {
-    if (not newTarget or newTarget == lockedTarget)
+    // AI target selection continues while the radar is powered down. Do not
+    // let those requests recreate a radar track after SetPower cleared it.
+    if (not isOn)
+    {
+        ClearSensorTarget();
+        return;
+    }
+    // Losing or explicitly releasing a target must drop the track while
+    // leaving radar power and emission unchanged. Use the radar override
+    // so the previous target also receives its unlock notification.
+    if (not newTarget)
+    {
+        SetSensorTarget(NULL);
+        lastTargetLockSend = 0;
+        return;
+    }
+    if (newTarget == lockedTarget)
     {
         return;
     }
@@ -217,12 +233,18 @@ void RadarClass::ClearSensorTarget(void)
 
 void RadarClass::DisplayInit(ImageBuffer* newImage)
 {
+#ifdef FF_HEADLESS
+    // Cockpit presentation is supplied by the external observer.
+#else
+
     DisplayExit();
 
     privateDisplay = new Render2D;
     ((Render2D*)privateDisplay)->Setup(newImage);
 
     privateDisplay->SetColor(0xff00ff00);
+
+#endif
 }
 
 

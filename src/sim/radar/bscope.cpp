@@ -74,6 +74,10 @@ void DrawSteerPointCursorData(VirtualDisplay* display, FalconEntity* platform,
 
 void RadarDopplerClass::Display(VirtualDisplay* newDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float cX, cY;
     float vpLeft, vpTop, vpRight, vpBottom;
 
@@ -557,12 +561,18 @@ void RadarDopplerClass::Display(VirtualDisplay* newDisplay)
     }
 
     display = NULL;
+
+#endif
 }
 
 
 // JPO - do stdby/off display
 void RadarDopplerClass::STBYDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float cX, cY;
     display->SetColor(GetMfdColor(MFD_LABELS));
 
@@ -615,11 +625,17 @@ void RadarDopplerClass::STBYDisplay(void)
     }
 
     AABottomRow();
+
+#endif
 }
 
 
 void RadarDopplerClass::DrawTargets(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float az;
     SimObjectType* theTarget = platform->targetList;
 
@@ -642,6 +658,8 @@ void RadarDopplerClass::DrawTargets(void)
 
         theTarget = theTarget->next;
     }
+
+#endif
 }
 //MI
 int RadarDopplerClass::GetInterogate(SimObjectType* rdrObj,
@@ -653,6 +671,10 @@ int RadarDopplerClass::GetInterogate(SimObjectType* rdrObj,
 
 void RadarDopplerClass::DrawAzElTicks(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     int i;
     float posStep;
     float curPos;
@@ -729,10 +751,16 @@ void RadarDopplerClass::DrawAzElTicks(void)
             curPos += posStep;
         }
     }
+
+#endif
 }
 
 void RadarDopplerClass::DrawBars(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     char str[32];
 
     if (IsSet(MenuMode bitor CtlMode))
@@ -755,10 +783,16 @@ void RadarDopplerClass::DrawBars(void)
     sprintf(str, "%.0f", displayAzScan * 0.1F * RTD);
     ShiAssert(strlen(str) < sizeof(str));
     LabelButton(17, "A", str);
+
+#endif
 }
 
 void RadarDopplerClass::DrawWaterline(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float yPos, theta;
 
     static const float InsideEdge = 0.08f;
@@ -788,10 +822,16 @@ void RadarDopplerClass::DrawWaterline(void)
     display->ZeroRotationAboutOrigin();
     display->CenterOriginInViewport();
     display->SetColor(tmpColor); // RV - I-Hawk - Return to green
+
+#endif
 }
 
 void RadarDopplerClass::DrawScanMarkers(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float yPos;
     float curPos;
 
@@ -888,10 +928,16 @@ void RadarDopplerClass::DrawScanMarkers(void)
                       elReacqMark[1][1]);
         display->CenterOriginInViewport();
     }
+
+#endif
 }
 
 void RadarDopplerClass::DrawRangeTicks(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float Hstart = 0.90f;
     static const float Hstop = 0.98f;
 
@@ -899,10 +945,16 @@ void RadarDopplerClass::DrawRangeTicks(void)
     display->Line(Hstart, 0.0f, Hstop, 0.0f);
     display->Line(Hstart, 0.5f, Hstop, 0.5f);
     display->Line(Hstart, -0.5f, Hstop, -0.5f);
+
+#endif
 }
 
 void RadarDopplerClass::DrawRange(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     char str[8];
 
     if (IsSet(MenuMode bitor CtlMode))
@@ -916,10 +968,16 @@ void RadarDopplerClass::DrawRange(void)
     sprintf(str, "%.0f", displayRange);
     ShiAssert(strlen(str) < sizeof(str));
     display->TextLeftVertical(x18, y18 + (y19 - y18) / 2, str);
+
+#endif
 }
 
 void RadarDopplerClass::DrawRangeArrows(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float arrowH = 0.0375f;
     static const float arrowW = 0.0433f;
 
@@ -966,10 +1024,18 @@ void RadarDopplerClass::DrawRangeArrows(void)
     }
 
     display->CenterOriginInViewport();
+
+#endif
 }
 //MI
 void RadarDopplerClass::DrawIFFStatus(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
+
+#endif
 }
 int RadarDopplerClass::GetCurScanMode(int i)
 {
@@ -977,6 +1043,10 @@ int RadarDopplerClass::GetCurScanMode(int i)
 }
 void RadarDopplerClass::RWSDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     int i;
     float xPos, yPos, alt;
     char str[12];
@@ -1357,10 +1427,16 @@ void RadarDopplerClass::RWSDisplay(void)
 
         rdrObj = rdrObj->next;
     }
+
+#endif
 }
 
 void RadarDopplerClass::SAMDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float ang;
     char str[20];
     FireControlComputer* pFCC = ((SimVehicleClass*)platform)->GetFCC();
@@ -1490,10 +1566,16 @@ void RadarDopplerClass::SAMDisplay(void)
         // Add Azimuth limit markers
         DrawAzLimitMarkers();
     }
+
+#endif
 }
 
 void RadarDopplerClass::ACMDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     display->SetColor(GetMfdColor(MFD_LABELS));
 
     // OSS Button Labels
@@ -1552,10 +1634,16 @@ void RadarDopplerClass::ACMDisplay(void)
         if (mode == ACM_SLEW)
             DrawSlewCursor();
     }
+
+#endif
 }
 
 void RadarDopplerClass::TWSDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float xPos, yPos, alt;
     char str[12];
     float ang, vt;
@@ -2040,10 +2128,16 @@ void RadarDopplerClass::TWSDisplay(void)
 
         rdrObj = rdrObj->next;
     }
+
+#endif
 }
 
 void RadarDopplerClass::VSModeDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     display->SetColor(GetMfdColor(MFD_LABELS));
 
     // OSS Button Labels
@@ -2075,10 +2169,16 @@ void RadarDopplerClass::VSModeDisplay(void)
 
     if (IsSet(STTingTarget))
         STTDisplay();
+
+#endif
 }
 
 void RadarDopplerClass::STTDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float xPos, yPos, alt;
     char str[12];
     float ang, vt;
@@ -2253,10 +2353,16 @@ void RadarDopplerClass::STTDisplay(void)
     {
         Pointer = 0;
     }
+
+#endif
 }
 
 void RadarDopplerClass::VSDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     int i;
     float xPos, yPos;
     SimObjectType* rdrObj = platform->targetList;
@@ -2366,10 +2472,16 @@ void RadarDopplerClass::VSDisplay(void)
             rdrObj = rdrObj->next;
         }
     }
+
+#endif
 }
 
 void RadarDopplerClass::DrawACQCursor(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     if (IsSet(STTingTarget)) // MD -- 20031222: don't draw this in STT
         return;
 
@@ -2535,10 +2647,16 @@ void RadarDopplerClass::DrawACQCursor(void)
 
     display->SetColor(tmpColor);
     display->CenterOriginInViewport();
+
+#endif
 }
 
 void RadarDopplerClass::DrawSlewCursor(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float up, lw, z, ang, height, theta;
     char str[8];
     FireControlComputer* pFCC =
@@ -2628,10 +2746,16 @@ void RadarDopplerClass::DrawSlewCursor(void)
         display->TextLeft(0.04F, -0.055F, str);
         display->SetColor(tempcolor);
     }
+
+#endif
 }
 
 void RadarDopplerClass::DrawAzLimitMarkers(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     if (IsAADclt(AzBar))
         return;
 
@@ -2650,6 +2774,8 @@ void RadarDopplerClass::DrawAzLimitMarkers(void)
         x = max(disDeg * (seekerAzCenter - (azScan + beamWidth)), -0.99F);
         display->Line(x, 1.0F, x, -1.0F);
     }
+
+#endif
 }
 
 // JPo - redone for new symbols and new colours.
@@ -2658,6 +2784,10 @@ void RadarDopplerClass::DrawAzLimitMarkers(void)
 void RadarDopplerClass::DrawSymbol(int type, float schweemLen, int age,
                                    int flash)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float tgtSize = 0.04f;
     static const float jamSizeW = 0.12f;
     static const float jamSizeH = 0.16f;
@@ -2882,6 +3012,8 @@ void RadarDopplerClass::DrawSymbol(int type, float schweemLen, int age,
     } /*switch*/
 
     display->scaleY = OldScaleY, display->scaleX = OldScaleX;
+
+#endif
 }
 
 int RadarDopplerClass::IsUnderCursor(SimObjectType* rdrObj, float heading)
@@ -2969,6 +3101,10 @@ int RadarDopplerClass::IsUnderVSCursor(SimObjectType* rdrObj, float heading)
 void RadarDopplerClass::DrawCollisionSteering(SimObjectType* buggedTarget,
                                               float curX)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float dx, dy, xPos = 0.0F;
     vector collPoint;
 
@@ -3036,10 +3172,16 @@ void RadarDopplerClass::DrawCollisionSteering(SimObjectType* buggedTarget,
 
         display->AdjustOriginInViewport(-xPos, 0.0F);
     }
+
+#endif
 }
 
 void RadarDopplerClass::DrawSteerpoint(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float az, range, xPos, yPos;
     float curSteerpointX, curSteerpointY, curSteerpointZ;
 
@@ -3109,10 +3251,16 @@ void RadarDopplerClass::DrawSteerpoint(void)
         display->Circle(xPos, yPos, 0.04F);
         display->Circle(xPos, yPos, 0.01F);
     }
+
+#endif
 }
 
 void RadarDopplerClass::DrawDLZSymbol(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     if (IsAADclt(Dlz))
         return;
 
@@ -3383,6 +3531,8 @@ void RadarDopplerClass::DrawDLZSymbol(void)
 
         display->SetColor(color);
     }
+
+#endif
 }
 
 // JPO fetch bugged target
@@ -3497,6 +3647,10 @@ void RadarDopplerClass::TargetToXY(SimObjectLocalData* localData, int hist,
 
 void RadarDopplerClass::DrawNCTR(bool TWS)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     // 2002-02-25 ADDED BY S.G. If not capable of handling NCTR, then don't do it
     if (not(radarData->flag bitand RAD_NCTR))
         return;
@@ -3572,10 +3726,16 @@ void RadarDopplerClass::DrawNCTR(bool TWS)
     display->TextCenter(0.0F, 0.75F, string);
     // End Marco Edit
 #endif
+
+#endif
 }
 //MI
 void RadarDopplerClass::AGRangingDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     //if we have a lock, we loose it here
     DropGMTrack();
     float cX, cY;
@@ -3649,10 +3809,16 @@ void RadarDopplerClass::AGRangingDisplay(void)
         DrawBullseyeCircle(display, cX, cY);
     else
         DrawReference(display);
+
+#endif
 }
 //MI
 void RadarDopplerClass::DrawReference(VirtualDisplay* display)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* self = SimDriver.GetPlayerAircraft();
 
     if (not self)
@@ -3779,6 +3945,8 @@ void RadarDopplerClass::DrawReference(VirtualDisplay* display)
     }
 
     display->Line(x, yref + 0.086f, x, yref - 0.13f);
+
+#endif
 }
 //MI
 void RadarDopplerClass::SetInterogateTimer(int Dir)

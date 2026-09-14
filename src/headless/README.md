@@ -1,3 +1,50 @@
+# Current detailed runtime (2026-09-14)
+
+Control/action command readers share file deletion so clients can atomically
+replace commands while the observer polls. Commands larger than 4096 bytes are
+ignored. The Godot action writer retries transient rename failures up to twenty
+times asynchronously and releases its pending state if transmission fails.
+
+Aircraft radar power uses the same `action.txt` protocol with `radar_on` and
+`radar_off`. These commands call the original sensor SetPower immediately,
+including while paused; `applied` confirms the resulting power state. Power-off
+clears the radar track and emission through the original radar implementation.
+Power-on also invokes native SetEmitting(TRUE), since SetPower alone retains
+the prior shutdown emission state. Native fault/range gates still apply.
+Missing radar and a denied
+power change return `radar_unavailable` and `sensor_power_denied` respectively.
+Only local, awake, living aircraft inside the active region accept these
+commands. Radar power is retained by flight ID and pilot slot across reaggregation/re-entry
+within this process. Save/resume persistence is not implemented.
+
+Native per-aircraft countermeasure commands use a separate atomic `action.txt`:
+`sequence creator_id entity_number chaff|flare`. IDs are the two decimal halves
+of a snapshot actor ID. Sequence must strictly increase; malformed numeric fields
+and trailing fields are ignored. `state.json.unit_action` returns the last
+acknowledged sequence and acceptance/rejection status. `queued` acknowledges a
+native command flag, not a guaranteed release; aircraft/fault gates still run
+on the next physical frame. While paused, inventories remain unchanged until
+the user steps or resumes. Only awake local airborne aircraft inside the active
+region with available stores can accept commands. Duplicates, unsupported
+actions/actors, empty stores and inactive regions are rejected. The existing
+control heartbeat is still required; action files do not extend its lease.
+
+Snapshots distinguish `chaff`, `flare` and `debris`, retain `native_class_name`,
+and associate weapons/decoys with `parent_id`; displayed team is the launcher's.
+Aircraft `countermeasures` contains current native chaff/flare station counts.
+
+The aggregate-only boundaries below describe the earlier checkpoint.
+`FF_BUILD_DETAILED_ENGINE=ON` now links original actors, AI, sensors, weapons,
+terrain/collision and damage into the observer with a 20 ms physical clock.
+Regional capabilities advertise native detailed combat and projectile state.
+The parent workspace's `scripts/verify-detailed.py` exercises ten diagnostics,
+including five-minute ground and opposing-aircraft combat with campaign loss
+round-trip. This remains experimental; all platforms/weapons and long detailed
+runs have not been validated. Player cockpit input remains unsupported.
+See the parent `headless-validation/PROGRESS.md` for current evidence and limits.
+
+---
+
 # Offline campaign host
 
 `ff-campaign run` executes the native aggregate FreeFalcon campaign engine in a
@@ -22,6 +69,11 @@ ctest --test-dir build/headless -C Release --output-on-failure
 For extracted ATL, pass `FF_ATL_INCLUDE` and `FF_ATL_LIB`. Set
 `FF_BUILD_CAMPAIGN_ENGINE=OFF` for the C++17 inspector without Windows/ATL.
 `FF_BUILD_DEBUG_RUNNER=ON` builds an optional Windows exception investigation tool.
+Set `_NO_DEBUG_HEAP=1` when reproducing normal-runtime heap faults under this
+helper. Windows otherwise changes allocation behavior for a debugged child.
+The helper inherits redirected standard handles and logs exception registers;
+the generated `ff-campaign.map` can resolve module-relative addresses if PDB
+symbol loading is unavailable.
 
 ## Run
 

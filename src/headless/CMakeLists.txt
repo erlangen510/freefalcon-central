@@ -27,7 +27,7 @@ set(FF_ATL_LIB "" CACHE PATH "Optional ATL x64 library directory")
 add_library(ff_headless_options INTERFACE)
 target_compile_options(ff_headless_options INTERFACE /Zi /GL /Gy /Gw /Zc:inline- /source-charset:.1252 /W0 /EHsc)
 target_compile_definitions(ff_headless_options INTERFACE FF_HEADLESS=1 NDEBUG _LIB WIN32 STRICT WIN32_LEAN_AND_MEAN WINDOWS_IGNORE_PACKING_MISMATCH _CRT_SECURE_NO_WARNINGS)
-target_include_directories(ff_headless_options INTERFACE
+target_include_directories(ff_headless_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
   ${FF_ROOT} ${FF_ROOT}/include ${FF_ROOT}/campaign/include ${FF_ROOT}/falclib/include
   ${FF_ROOT}/sim/include ${FF_ROOT}/graphics/include ${FF_ROOT}/graphics
   ${FF_ROOT}/codelib/include ${FF_ROOT}/vu2/include ${FF_ROOT}/ui/include
@@ -78,7 +78,7 @@ target_link_options(ff-campaign PRIVATE /DEBUG /MAP /LTCG /OPT:REF /OPT:ICF)
 target_link_libraries(ff_campaign_engine PRIVATE ff_scenario)
 target_link_libraries(ff-campaign PRIVATE ff_campaign_engine)
 target_compile_definitions(ff-campaign PRIVATE FF_CAMPAIGN_ENGINE=1)
-option(FF_BUILD_NATIVE_DYNAMICS "Compile original missile dynamics for the detailed-engine port (not yet connected)" OFF)
+option(FF_BUILD_NATIVE_DYNAMICS "Also build the standalone missile dynamics compilation probe" OFF)
 if(FF_BUILD_NATIVE_DYNAMICS)
   add_library(ff_native_missile_dynamics STATIC
     ${FF_ROOT}/sim/missile/accel.cpp ${FF_ROOT}/sim/missile/aero.cpp
@@ -89,6 +89,32 @@ if(FF_BUILD_NATIVE_DYNAMICS)
   target_link_libraries(ff_native_missile_dynamics PRIVATE ff_headless_options)
 endif()
 option(FF_BUILD_DEBUG_RUNNER "Build the Windows crash investigation helper" OFF)
+option(FF_BUILD_DETAILED_ENGINE "Build the original individual simulation runtime" ON)
+if(NOT FF_BUILD_DETAILED_ENGINE)
+  message(FATAL_ERROR "The campaign observer now requires FF_BUILD_DETAILED_ENGINE=ON. Use FF_BUILD_CAMPAIGN_ENGINE=OFF for the standalone inspector.")
+endif()
+if(FF_BUILD_DETAILED_ENGINE)
+  target_compile_definitions(ff_headless_options INTERFACE FF_DETAILED_ENGINE=1)
+  target_sources(ff_campaign_engine PRIVATE ${FF_ROOT}/sim/simdrive/simatc.cpp detailed.cpp countermeasure_test.cpp region.cpp sim_services.cpp detailed_presentation.cpp physical_world.cpp physical_materials.cpp physical_models.cpp
+    ${FF_ROOT}/sim/displays/sms.cpp ${FF_ROOT}/sim/displays/mslsms.cpp ${FF_ROOT}/sim/displays/bombsms.cpp ${FF_ROOT}/sim/displays/gunsms.cpp
+    ${FF_ROOT}/sim/eject/simeject.cpp ${FF_ROOT}/sim/navaids/navsystem.cpp
+    ${FF_ROOT}/graphics/objects/drawbsp.cpp
+    ${FF_ROOT}/graphics/objects/drawtrcr.cpp ${FF_ROOT}/graphics/objects/drawgrnd.cpp ${FF_ROOT}/graphics/objects/drawguys.cpp
+    ${FF_ROOT}/graphics/bsplib/objectinstance.cpp
+    ${FF_ROOT}/graphics/utils/matrix.cpp ${FF_ROOT}/graphics/3dlib/math.cpp ${FF_ROOT}/graphics/weather/tod.cpp ${FF_ROOT}/graphics/weather/star.cpp ${FF_ROOT}/graphics/utils/timemgr.cpp)
+  target_compile_definitions(ff_campaign_engine PRIVATE FF_DETAILED_ENGINE=1)
+  engine_library(ff_simlib sim/simlib/simlib.vcxproj)
+  engine_library(ff_missile sim/missile/missile.vcxproj)
+  engine_library(ff_radar sim/radar/radar.vcxproj)
+  engine_library(ff_irst sim/irst/irst.vcxproj)
+  engine_library(ff_rwr sim/rwr/rwr.vcxproj)
+  engine_library(ff_visual sim/visual/visual.vcxproj)
+  target_link_libraries(ff_campaign_engine PRIVATE ff_simlib ff_missile ff_radar ff_irst ff_rwr ff_visual ff_faults ff_ground ff_guns ff_bomb ff_aircraft ff_airframe ff_digi ff_fcc ff_helo ff_hdigi ff_feature)
+  foreach(component aircraft airframe ground feature helo digi hdigi fcc guns bomb faults)
+    engine_library(ff_${component} sim/${component}/${component}.vcxproj)
+    # Vehicle runtime linkage follows the native weapon runtime.
+  endforeach()
+endif()
 if(FF_BUILD_DEBUG_RUNNER)
   add_executable(ff-debug-runner debug_runner.cpp)
   target_link_libraries(ff-debug-runner PRIVATE dbghelp)

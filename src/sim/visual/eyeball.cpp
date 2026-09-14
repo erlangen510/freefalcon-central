@@ -50,13 +50,20 @@ SimObjectType* EyeballClass::Exec(SimObjectType* newTargetList)
     {
 
         // Can't hold a lock if its outside our sensor cone
-        if (not CanSeeObject(lockedTarget))
+        const bool visible=CanSeeObject(lockedTarget);
+        const bool detectable=CanDetectObject(lockedTarget);
+#ifdef FF_HEADLESS
+        static unsigned missileObservations=0;
+        if(platform->IsMissile() && missileObservations++<8)
+            fprintf(stderr,"[missile-visual] visible=%d detectable=%d hidden=%d los=%d az=%.3f el=%.3f\n",int(visible),int(detectable),lockedTarget->BaseData()->IsSim()?int(static_cast<SimBaseClass*>(lockedTarget->BaseData())->IsSetLocalFlag(IS_HIDDEN)):0,platform->CheckCompositeLOS(lockedTarget),lockedTarget->localData->az,lockedTarget->localData->el);
+#endif
+        if (not visible)
         {
             newLock = NULL;
         }
 
         // Can't hold lock if the object is too far away or is occluded
-        if (not CanDetectObject(lockedTarget))
+        if (not detectable)
         {
             newLock = NULL;
         }
@@ -147,6 +154,12 @@ EyeballClass::~EyeballClass(void)
 
 float EyeballClass::GetSignature(SimObjectType* obj)
 {
+    // The aircraft-specific visibility calculation below has no branch for
+    // ships, vehicles or features and otherwise leaves their detection range
+    // at zero. Use the original visual sensor's nominal detection range for
+    // these targets; CanDetectObject still enforces hiding and composite LOS.
+    if(!obj->BaseData()->IsAirplane())
+        return obj->localData->range <= typeData->nominalRange ? 1.0f : 0.0f;
     float bonus = 1.25F;
     float objAlt = -obj->BaseData()->ZPos() * 0.001F;
 

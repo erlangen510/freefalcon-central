@@ -71,7 +71,8 @@ void HeliBrain::TargetSelection(void)
     // check to see if our current ground target is a sim and exploding or
     // dead, if so let's get a new target from the campaign
     if (targetPtr and targetPtr->BaseData()->IsSim() and
-        (targetPtr->BaseData()->IsExploding() or
+        (targetPtr->BaseData()->IsDead() or targetPtr->BaseData()->IsExploding() or
+         ((SimBaseClass *)targetPtr->BaseData())->IsSetRemoveFlag() or
          not((SimBaseClass *)targetPtr->BaseData())->IsAwake()))
     {
         ClearTarget();
@@ -120,7 +121,13 @@ void HeliBrain::TargetSelection(void)
     campUnit->UnsetChecked();
 
     // choose target.  I assume if this returns 0, no target....
-    if (not campUnit->ChooseTarget())
+    const int chosen=campUnit->ChooseTarget();
+#ifdef FF_HEADLESS
+    static unsigned targetObservations=0;
+    if(targetObservations++<12)
+        fprintf(stderr,"[helo-target] actor=%lu chosen=%d final=%d mission=%d target=%lu\n",self->Id().num_,chosen,campUnit->Final(),campUnit->GetUnitMission(),campUnit->GetTarget()?campUnit->GetTarget()->Id().num_:0);
+#endif
+    if (not chosen)
     {
         ClearTarget();
         // alternately try and choose the waypoint's target
@@ -151,10 +158,10 @@ void HeliBrain::TargetSelection(void)
         return;
     }
 
-    // we've a SIM target, go get a component
+    // A deaggregated campaign unit owns the individual simulation targets.
 
     // M.N. use S.G.'s FindSimGroundTarget function to choose a sim entity
-    if (target->IsSim() and target->OnGround())
+    if (target->IsCampaign() and target->OnGround())
     {
         simTarg = FindSimGroundTarget(
             (CampBaseClass *)target,
@@ -164,7 +171,8 @@ void HeliBrain::TargetSelection(void)
             return;
 
         // set it as our target
-        if (not simTarg->IsExploding() and not simTarg->IsDead() and
+        if (simTarg->IsAwake() and not simTarg->IsSetRemoveFlag() and
+            not simTarg->IsExploding() and not simTarg->IsDead() and
             simTarg->pctStrength > 0.0f) // still alive?
             SetTargetEntity(simTarg);
 
@@ -220,7 +228,8 @@ SimBaseClass *HeliBrain::FindSimGroundTarget(CampBaseClass *targetGroup,
             continue;
 
         // Is it alive?
-        if (simTarg->IsExploding() or simTarg->IsDead() or
+        if (not simTarg->IsAwake() or simTarg->IsSetRemoveFlag() or
+            simTarg->IsExploding() or simTarg->IsDead() or
             simTarg->pctStrength <= 0.0f)
             continue; // Dead thing, ignore it.
 

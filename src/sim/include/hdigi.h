@@ -243,6 +243,15 @@ public:
     int flags;
     int isWing;
     float pStick, rStick, yPedal, throtl;
+    float commandedAltitudeAGL = 0.0f;
+    bool hasAltitudeCommand = false;
+    bool rocketAimValid = false;
+    float rocketAimPitch = 0.0f;
+    float rocketAimError = 0.0f;
+    float rocketAimTolerance = 0.0f;
+    unsigned long rocketAimNextUpdate = 0;
+    VU_ID rocketAimTarget;
+    void UpdateRocketAim();
     virtual void Sleep(void)
     {
         ClearTarget();

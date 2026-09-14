@@ -10,7 +10,11 @@ int wmain(int argc, wchar_t** argv) {
     std::wstring command;
     for (int i = 1; i < argc; ++i) { if (i > 1) command += L' '; command += L'"'; command += argv[i]; command += L'"'; }
     STARTUPINFOW si = {sizeof(si)}; PROCESS_INFORMATION pi{};
-    if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, DEBUG_ONLY_THIS_PROCESS | CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) return 2;
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, TRUE, DEBUG_ONLY_THIS_PROCESS | CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) return 2;
     SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
     SymInitialize(pi.hProcess, nullptr, FALSE);
     DEBUG_EVENT ev{};
@@ -40,6 +44,7 @@ int wmain(int argc, wchar_t** argv) {
                 }
                 HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, ev.dwThreadId);
                 CONTEXT ctx{}; ctx.ContextFlags = CONTEXT_FULL; GetThreadContext(thread, &ctx);
+                fprintf(stderr,"registers rcx=%llx rdi=%llx rsi=%llx r12=%llx rax=%llx fault=%llx\n",ctx.Rcx,ctx.Rdi,ctx.Rsi,ctx.R12,ctx.Rax,ex.ExceptionRecord.ExceptionInformation[1]);
                 STACKFRAME64 frame{};
                 frame.AddrPC = {ctx.Rip, 0, AddrModeFlat}; frame.AddrStack = {ctx.Rsp, 0, AddrModeFlat}; frame.AddrFrame = {ctx.Rbp, 0, AddrModeFlat};
                 for (int i = 0; i < 30 && StackWalk64(IMAGE_FILE_MACHINE_AMD64, pi.hProcess, thread, &frame, &ctx, nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr); ++i) {

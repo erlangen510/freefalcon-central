@@ -690,7 +690,7 @@ void ObjectiveClass::SendDeaggregateData(VuTargetEntity *target)
 
 int ObjectiveClass::Deaggregate(FalconSessionEntity *session)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ObjectiveClass::Deaggregate");
 #else
 
@@ -830,7 +830,7 @@ int ObjectiveClass::Deaggregate(FalconSessionEntity *session)
 //int ObjectiveClass::RecordCurrentState (FalconSessionEntity *session, int byReag)
 int ObjectiveClass::RecordCurrentState(FalconSessionEntity *session, int)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ObjectiveClass::RecordCurrentState");
 #else
 
@@ -868,7 +868,7 @@ int ObjectiveClass::RecordCurrentState(FalconSessionEntity *session, int)
 //int ObjectiveClass::Reaggregate (FalconSessionEntity* session)
 int ObjectiveClass::Reaggregate(FalconSessionEntity *)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ObjectiveClass::Reaggregate");
 #else
 
@@ -1002,7 +1002,7 @@ int ObjectiveClass::TransferOwnership(FalconSessionEntity *session)
 
 int ObjectiveClass::Wake()
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ObjectiveClass::Wake");
 #else
 
@@ -1035,7 +1035,7 @@ int ObjectiveClass::Wake()
 
 int ObjectiveClass::Sleep(void)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     SetAwake(0); return 1;
 #else
 

@@ -21,7 +21,7 @@ public:
     /** derefs entity pointed to */
     ~VuBin()
     {
-        //VuDeReferenceEntity(e);
+        VuDeReferenceEntity(e);
     }
 
     /** assignment using vubin */

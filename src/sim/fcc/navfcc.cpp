@@ -800,6 +800,10 @@ void FireControlComputer::StepPoint(void)
 
 void FireControlComputer::NavDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     //MI SOI
     CouldBeSOI = TRUE;
 
@@ -1132,6 +1136,8 @@ void FireControlComputer::NavDisplay(void)
     }
 
     display->CenterOriginInViewport();
+
+#endif
 }
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -1143,6 +1149,10 @@ void FireControlComputer::NavDisplay(void)
 
 void FireControlComputer::DrawNavPoints(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1207,6 +1217,8 @@ void FireControlComputer::DrawNavPoints(void)
         break;
         }
     }
+
+#endif
 }
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -1218,6 +1230,10 @@ void FireControlComputer::DrawNavPoints(void)
 
 void FireControlComputer::DrawWayPoints()
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1252,6 +1268,8 @@ void FireControlComputer::DrawWayPoints()
             curWaypoint = curWaypoint->GetNextWP();
         }
     }
+
+#endif
 }
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -1263,6 +1281,10 @@ void FireControlComputer::DrawWayPoints()
 
 void FireControlComputer::DrawMarkPoints(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1291,6 +1313,8 @@ void FireControlComputer::DrawMarkPoints(void)
                 DrawPointSymbol(curWaypoint, displayX, displayY);
         }
     }
+
+#endif
 }
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -1302,6 +1326,10 @@ void FireControlComputer::DrawMarkPoints(void)
 
 void FireControlComputer::DrawLinkPoints(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1348,10 +1376,16 @@ void FireControlComputer::DrawLinkPoints(void)
             prevWaypoint = curWaypoint;
         }
     }
+
+#endif
 }
 //MI
 void FireControlComputer::DrawDESTOAPoints(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1382,9 +1416,15 @@ void FireControlComputer::DrawDESTOAPoints(void)
             }
         }
     }
+
+#endif
 }
 void FireControlComputer::DrawVIPOAPoints(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     //MI
     /*if(g_bRealisticAvionics and g_bINS)
     {
@@ -1413,9 +1453,15 @@ void FireControlComputer::DrawVIPOAPoints(void)
             }
         }
     }
+
+#endif
 }
 void FireControlComputer::DrawVRPOAPoints(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     //MI
     /*if(g_bRealisticAvionics and g_bINS)
     {
@@ -1444,6 +1490,8 @@ void FireControlComputer::DrawVRPOAPoints(void)
             }
         }
     }
+
+#endif
 }
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -1504,10 +1552,16 @@ void FireControlComputer::DrawPointPair(WayPointClass* curWaypoint, float x2,
                                         float y2, float displayX,
                                         float displayY)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     if (not(curWaypoint->GetWPFlags() bitand WPF_ALTERNATE))
         display->Line(x2, y2, displayX, displayY);
 
     DrawPointSymbol(curWaypoint, displayX, displayY);
+
+#endif
 }
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -1520,6 +1574,10 @@ void FireControlComputer::DrawPointPair(WayPointClass* curWaypoint, float x2,
 void FireControlComputer::DrawPointSymbol(WayPointClass* curWaypoint,
                                           float displayX, float displayY)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     if (not g_bRealisticAvionics)
         return;
 
@@ -1555,6 +1613,8 @@ void FireControlComputer::DrawPointSymbol(WayPointClass* curWaypoint,
                 g_fHSDSymbolSize); //Wombat778 11-13-2003 Make the symbol size configurable
         }
     }
+
+#endif
 }
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -1568,6 +1628,10 @@ static const float LGDELTA = 0.1f; // larger distance for symbols
 
 void FireControlComputer::DrawTGTSymbol(float displayX, float displayY)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float SMDELTA =
         g_fHSDSymbolSize; //Wombat778 11-13-2003 Set SMDELTA to the external variable
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
@@ -1585,6 +1649,8 @@ void FireControlComputer::DrawTGTSymbol(float displayX, float displayY)
                   displayY + SMDELTA);
     display->Line(displayX + SMDELTA, displayY - SMDELTA, displayX - SMDELTA,
                   displayY - SMDELTA);
+
+#endif
 }
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -1596,6 +1662,10 @@ void FireControlComputer::DrawTGTSymbol(float displayX, float displayY)
 
 void FireControlComputer::DrawIPSymbol(float displayX, float displayY)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float SMDELTA =
         g_fHSDSymbolSize; //Wombat778 11-13-2003 Set SMDELTA to the external variable
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
@@ -1615,6 +1685,8 @@ void FireControlComputer::DrawIPSymbol(float displayX, float displayY)
                   displayY + SMDELTA);
     display->Line(displayX + SMDELTA, displayY - SMDELTA, displayX - SMDELTA,
                   displayY - SMDELTA);
+
+#endif
 }
 
 /////////////////////////////////////////////////////////////////
@@ -1626,6 +1698,10 @@ void FireControlComputer::DrawIPSymbol(float displayX, float displayY)
 void FireControlComputer::DrawMarkSymbol(float displayX, float displayY,
                                          int type)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float SMDELTA =
         g_fHSDSymbolSize; //Wombat778 11-13-2003 Set SMDELTA to the external variable
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
@@ -1642,12 +1718,18 @@ void FireControlComputer::DrawMarkSymbol(float displayX, float displayY,
                   displayY + dist);
     display->Line(displayX - dist, displayY + dist, displayX + dist,
                   displayY - dist);
+
+#endif
 }
 //MI
 const static float TriangleDist = 0.05F;
 const static float CircleDia = 0.05F;
 void FireControlComputer::DrawDESTOASymbol(float displayX, float displayY)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1665,9 +1747,15 @@ void FireControlComputer::DrawDESTOASymbol(float displayX, float displayY)
     display->Line(X1, Y1, X1 + XOffset * 2, Y1);
     display->Line(X1 + XOffset * 2, Y1, X1 + XOffset, Y1 + YOffset * 2);
     display->Line(X1 + XOffset, Y1 + YOffset * 2, X1, Y1);
+
+#endif
 }
 void FireControlComputer::DrawVIPOASymbol(float displayX, float displayY)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1678,9 +1766,15 @@ void FireControlComputer::DrawVIPOASymbol(float displayX, float displayY)
     }
 
     display->Circle(displayX, displayY, CircleDia);
+
+#endif
 }
 void FireControlComputer::DrawVRPOASymbol(float displayX, float displayY)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1691,10 +1785,16 @@ void FireControlComputer::DrawVRPOASymbol(float displayX, float displayY)
     }
 
     display->Circle(displayX, displayY, CircleDia);
+
+#endif
 }
 
 void FireControlComputer::DrawFLOT(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -1842,10 +1942,16 @@ void FireControlComputer::DrawFLOT(void)
             display->SetColor(tmpColor);
         }
     }
+
+#endif
 }
 
 void FireControlComputer::DrawBullseye(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
     //MI
     /*if(g_bRealisticAvionics and g_bINS)
@@ -1900,11 +2006,17 @@ void FireControlComputer::DrawBullseye(void)
             }
         }
     }
+
+#endif
 }
 
 
 void FireControlComputer::DrawPPThreats(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -2049,10 +2161,16 @@ void FireControlComputer::DrawPPThreats(void)
        }
     */
 #endif
+
+#endif
 }
 
 void FireControlComputer::DrawGhostCursor(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
     RadarDopplerClass* theRadar =
         (RadarDopplerClass*)FindSensor(platform, SensorClass::Radar);
@@ -2099,10 +2217,16 @@ void FireControlComputer::DrawGhostCursor(void)
         display->Line(cursorX + GCURS_OFF, cursorY - GCURS_LEN,
                       cursorX + GCURS_OFF, cursorY + GCURS_LEN);
     }
+
+#endif
 }
 
 void FireControlComputer::DrawScanVolume(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -2133,6 +2257,8 @@ void FireControlComputer::DrawScanVolume(void)
         // 2002-03-08 MN This was missing (was present in V1.071) and messed up FLOT and Bullseye on HSD
         display->ZeroRotationAboutOrigin();
     }
+
+#endif
 }
 
 static const float SCH_ANG_INC =
@@ -2147,6 +2273,10 @@ static const float trackTriV = trackScale * (float)sin(DTR * 30.0f);
 
 void FireControlComputer::DrawBuggedTarget()
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -2232,11 +2362,17 @@ void FireControlComputer::DrawBuggedTarget()
         display->AdjustRotationAboutOrigin(-ang * DTR);
         display->AdjustOriginInViewport(-displayX, -displayY);
     }
+
+#endif
 }
 
 
 void FireControlComputer::DrawWingmen()
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -2271,11 +2407,17 @@ void FireControlComputer::DrawWingmen()
             Draw1WingmanGnd(wingman); //Cobra
         }
     }
+
+#endif
 }
 
 //Cobra GDLINK
 void FireControlComputer::Draw1WingmanGnd(AircraftClass* wing)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     if (g_bRealisticAvionics and g_bINS)
@@ -2427,10 +2569,16 @@ void FireControlComputer::Draw1WingmanGnd(AircraftClass* wing)
     display->TextCenterVertical(0.0f, 0.08f, no);
     display->AdjustOriginInViewport(-displayX, -displayY);
 
+
+#endif
 } //end function
 
 void FireControlComputer::Draw1Wingman(AircraftClass* wing)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
 
     //MI
@@ -2694,6 +2842,8 @@ void FireControlComputer::Draw1Wingman(AircraftClass* wing)
     display->TextCenterVertical(0.0f, -0.12f, thealt);
     display->TextCenterVertical(0.0f, 0.08f, no);
     display->AdjustOriginInViewport(-displayX, -displayY);
+
+#endif
 }
 
 //MI

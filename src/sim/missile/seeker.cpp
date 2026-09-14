@@ -56,20 +56,18 @@ void MissileClass::RunSeeker()
         ((targetPtr and targetPtr->BaseData()->IsSPJamming()) ? 1.5f : 1.0f);
 
     if (inputData->mslActiveTtg > 0 and
-            (timpct * factor < inputData->mslActiveTtg and
-             sensorArray[0]->Type() not_eq SensorClass::Radar) or
-        (launchState == InFlight and
-         sensorArray[0]->Type() not_eq SensorClass::Radar and
-         (not isSlave or
-          not targetPtr) //I-Hawk - was missing the parentheses here, caused heat seeker locking problems
-         ))
+        sensorArray[0]->Type() not_eq SensorClass::Radar and
+        (timpct * factor < inputData->mslActiveTtg or
+         (launchState == InFlight and (not isSlave or not targetPtr))))
     {
         GoActive();
         // sfr shouldnt we finish here?
     }
 
     // exec the sensor and get locked target
-    lockedTarget = sensorArray[0]->Exec(targetList);
+    // With an assigned target we updated its geometry above, not targetList.
+    // Visual/IR seekers scan the supplied list and otherwise see no candidate.
+    lockedTarget = sensorArray[0]->Exec(targetPtr ? targetPtr : targetList);
 
     // Make sure we don't target ourselves
     if (lockedTarget and lockedTarget->BaseData() == parent)

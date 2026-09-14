@@ -179,6 +179,7 @@ public:
     {
         return airTargetPtr;
     }
+    SimObjectType *GetGroundTargetPtr(void) const { return gndTargetPtr; }
 
 protected:
     // END OF ADDED SECTION

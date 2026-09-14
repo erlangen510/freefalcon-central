@@ -273,29 +273,13 @@ void HelicopterClass::Init(SimInitDataClass* initData)
 
      curWaypoint->GetLocation (&wp2X, &wp2Y, &wp2Z);
      }*/
-    //REMOVED OLD CODE; BEGIN REWRITE
+    // currentWaypoint is already an absolute index supplied by the campaign.
+    // Advancing it again skips orders; on the final waypoint the old fallback
+    // even selected the previous waypoint. Leave progression to HeliBrain.
     if (curWaypoint)
     {
-        if (curWaypoint == atWaypoint and
-            curWaypoint->GetWPFlags() bitand WPF_TAKEOFF and
-            curWaypoint->GetWPDepartureTime() > SimLibElapsedTime)
-        {
-            curWaypoint = atWaypoint;
-        }
-        else
-        {
-            curWaypoint = curWaypoint->GetNextWP();
-            atWaypoint->GetLocation(&wp1X, &wp1Y, &wp1Z);
-
-            if (curWaypoint == NULL)
-            {
-                wp1X = initData->x;
-                wp1Y = initData->y;
-                curWaypoint = atWaypoint;
-            }
-
-            curWaypoint->GetLocation(&wp2X, &wp2Y, &wp2Z);
-        }
+        atWaypoint->GetLocation(&wp1X, &wp1Y, &wp1Z);
+        curWaypoint->GetLocation(&wp2X, &wp2Y, &wp2Z);
     }
 
     // edg: note helicopters havve a capped AGL
@@ -365,6 +349,10 @@ void HelicopterClass::Init(SimInitDataClass* initData)
 int HelicopterClass::Wake()
 {
     SimVehicleClass::Wake();
+#ifdef FF_HEADLESS
+    extern void RestoreDetailedHelicopterState(HelicopterClass*);
+    RestoreDetailedHelicopterState(this);
+#endif
 
     InitDamageStation();
 
@@ -393,6 +381,10 @@ int HelicopterClass::Sleep(void)
     if (not IsAwake())
         return retval;
 
+#ifdef FF_HEADLESS
+    extern void RememberDetailedHelicopterState(HelicopterClass*);
+    RememberDetailedHelicopterState(this);
+#endif
     if (hBrain)
         hBrain->Sleep();
 
@@ -709,11 +701,15 @@ int HelicopterClass::Exec(void)
         } // use Dist LOD
 
         // if ( flightLead == this and SimLibElapsedTime > nextTargetUpdate )
-        if (SimLibElapsedTime > nextTargetUpdate)
+        const bool targetUnavailable = targetPtr && targetPtr->BaseData()->IsSim() &&
+            (targetPtr->BaseData()->IsDead() || targetPtr->BaseData()->IsExploding() ||
+             !static_cast<SimBaseClass*>(targetPtr->BaseData())->IsAwake() ||
+             static_cast<SimBaseClass*>(targetPtr->BaseData())->IsSetRemoveFlag());
+        if (SimLibElapsedTime > nextTargetUpdate || targetUnavailable)
         {
             hBrain->TargetSelection();
             SetTarget(hBrain->targetPtr);
-            // targetList = UpdateTargetList (targetList, this, SimDriver.combinedList);
+            targetList = UpdateTargetList(targetList, this, SimDriver.combinedList);
             nextTargetUpdate = SimLibElapsedTime + targetUpdateRate;
         }
 
@@ -724,6 +720,7 @@ int HelicopterClass::Exec(void)
         if (SimLibElapsedTime > nextGeomCalc)
         {
             CalcRelGeom(this, targetPtr, vmat, 1.0F / SimLibMajorFrameTime);
+            CalcRelGeom(this, targetList, vmat, 1.0F / SimLibMajorFrameTime);
 
             // Sensors
             RunSensors();

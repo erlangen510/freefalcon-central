@@ -33,11 +33,12 @@ void HelicopterClass::DoWeapons(void)
     Tpoint pos, vec;
 
     // Guns
-    fireFlag = fireGun;
+    fireFlag = fireGun and Sms and Sms->MasterArm() == SMSBaseClass::Arm;
 
     if (Guns)
     {
-        Guns->Exec(&fireFlag, gunDmx, &platformAngles, targetPtr, FALSE);
+        // Bullets may hit any nearby object, including a previous target.
+        Guns->Exec(&fireFlag, gunDmx, &platformAngles, targetList, FALSE);
 
         if (fireFlag)
         {

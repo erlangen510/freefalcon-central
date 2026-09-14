@@ -724,6 +724,10 @@ void Radar360Class::ExecAG(void)
 
 void Radar360Class::Display(VirtualDisplay* activeDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float scaledCosYaw, scaledSinYaw;
     char string[24];
     Falcon4EntityClassType* classPtr;
@@ -834,6 +838,8 @@ void Radar360Class::Display(VirtualDisplay* activeDisplay)
         ShiAssert(strlen(string) < sizeof(string));
         display->TextCenter(0.0F, 0.75F, string);
     }
+
+#endif
 }
 
 
@@ -1093,17 +1099,27 @@ float Radar360Class::CursorDelta(float x, float y)
 
 void Radar360Class::DrawCursor(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     const float delta = BLIP_SIZE * 2.0f;
 
     display->Line(cursorX - delta, cursorY - delta, cursorX - delta,
                   cursorY + delta);
     display->Line(cursorX + delta, cursorY - delta, cursorX + delta,
                   cursorY + delta);
+
+#endif
 }
 
 
 void Radar360Class::DrawBullseyeData(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float az, range;
     float cursX, cursY;
     char str[12];
@@ -1133,11 +1149,17 @@ void Radar360Class::DrawBullseyeData(void)
     ShiAssert(strlen(str) < sizeof(str));
     display->TextLeft(-0.95F, -0.75F, str);
     display->TextLeft(-0.95f, -0.65f, "BULLSEYE");
+
+#endif
 }
 
 
 void Radar360Class::DrawButtons(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float arrowH = 0.0375f;
     static const float arrowW = 0.0433f;
     char string[4];
@@ -1159,6 +1181,8 @@ void Radar360Class::DrawButtons(void)
     LabelButton(4, "AG", "", mode == GM);
     LabelButton(13, "FCR", NULL, 1);
     LabelButton(14, "SWAP", "");
+
+#endif
 }
 
 

@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "boundary.h"
+#endif
 #include "graphics/include/tviewpnt.h"
 extern "C" int FF_VkRttActive(void); // Vulkan display-RTT-open probe (gates PostSceneCloudOcclusion below)
 #include "graphics/include/renderir.h"
@@ -75,6 +78,10 @@ MaverickDisplayClass::MaverickDisplayClass(SimMoverClass* newPlatform)
 
 void MaverickDisplayClass::DisplayInit(ImageBuffer* image)
 {
+#ifdef FF_HEADLESS
+// Cockpit display is not instantiated by the headless AI runtime.
+#else
+
     if (not g_bGreyScaleMFD)
         g_bGreyMFD = false;
 
@@ -100,10 +107,16 @@ void MaverickDisplayClass::DisplayInit(ImageBuffer* image)
 
     //privateDisplay->SetColor (0xff00ff00);
     ((Render3D*)privateDisplay)->SetFOV(curFOV);
+
+#endif
 }
 
 void MaverickDisplayClass::Display(VirtualDisplay* newDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit display is not instantiated by the headless AI runtime.
+#else
+
     display = newDisplay;
 
     // SCR  9/1/98  Is it every legal to have viewPoint NULL???
@@ -122,10 +135,16 @@ void MaverickDisplayClass::Display(VirtualDisplay* newDisplay)
 
     if (IsReady())
         DrawDisplay();
+
+#endif
 }
 
 void MaverickDisplayClass::DrawDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit display is not instantiated by the headless AI runtime.
+#else
+
     float totalAngle;
     int tmpColor = display->Color();
 
@@ -447,10 +466,16 @@ void MaverickDisplayClass::DrawDisplay(void)
             }
         }
     }
+
+#endif
 }
 
 void MaverickDisplayClass::DrawTerrain(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit display is not instantiated by the headless AI runtime.
+#else
+
     Trotation viewRotation;
     Tpoint cameraPos;
     float xOff, yOff, zOff;
@@ -594,6 +619,8 @@ void MaverickDisplayClass::DrawTerrain(void)
 
        ((RenderTV*)display)->EndDraw();
      }*/
+
+#endif
 }
 
 void MaverickDisplayClass::LockTarget(void)
@@ -623,6 +650,10 @@ void MaverickDisplayClass::DropTarget(void)
 
 int MaverickDisplayClass::IsCentered(SimBaseClass* testObject)
 {
+#ifdef FF_HEADLESS
+ff_headless::unsupported("Player cockpit targeting control");
+#else
+
     Tpoint from;
     Tpoint at;
     Tpoint coll;
@@ -639,6 +670,8 @@ int MaverickDisplayClass::IsCentered(SimBaseClass* testObject)
     }
 
     return didSee;
+
+#endif
 }
 //MI
 void MaverickDisplayClass::DrawFOV(void)

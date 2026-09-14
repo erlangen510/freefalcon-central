@@ -11,10 +11,11 @@ int Run(const std::vector<std::string>& args) {
         std::cout << "Usage: ff-campaign inspect <scenario.cam>\n"
                      "Validates archive boundaries, metadata and compressed sections.\n"
                      "Run: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\n"
-                     "Watch: ff-campaign watch <data-root> <scenario-name> <session-directory> [seed]\n";
+                     "Watch: ff-campaign watch <data-root> <scenario-name> <session-directory> [seed]\n"
+                     "Detail: ff-campaign detail-test <data-root> <scenario-name> <hit|miss|unarmed|air|ground|helo|sea|feature|region> [seed]\n";
         return 0;
     }
-    if (args.size() >= 2 && (args[1] == "run" || args[1] == "watch")) {
+    if (args.size() >= 2 && (args[1] == "run" || args[1] == "watch" || args[1] == "detail-test")) {
 #ifdef FF_CAMPAIGN_ENGINE
         return RunLegacyCampaign(args);
 #else

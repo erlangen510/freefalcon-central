@@ -1,4 +1,7 @@
 #include "stdhdr.h"
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "f4vu.h"
 #include "simobj.h"
 #include "classtbl.h"
@@ -241,6 +244,7 @@ void* debugPtr = NULL;
 
 SimBaseClass* AddVehicleToSim(SimInitDataClass* initData, int motionType)
 {
+
     SimBaseClass* theVehicle = NULL;
     Falcon4EntityClassType* classPtr =
         &Falcon4ClassTable[initData->descriptionIndex - VU_LAST_ENTITY_TYPE];
@@ -287,11 +291,13 @@ SimBaseClass* AddVehicleToSim(SimInitDataClass* initData, int motionType)
     }
     else
         return NULL;
+
 }
 
 
 SimBaseClass* AddFeatureToSim(SimInitDataClass* initData)
 {
+
     SimFeatureClass* theFeature;
 
     /*------------------------*/
@@ -301,6 +307,7 @@ SimBaseClass* AddFeatureToSim(SimInitDataClass* initData)
     CalcTransformMatrix(theFeature);
     theFeature->Init(initData);
     return (theFeature);
+
 }
 
 /*=================================================================

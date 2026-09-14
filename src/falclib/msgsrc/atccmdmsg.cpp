@@ -66,7 +66,7 @@ FalconATCCmdMessage::~FalconATCCmdMessage(void)
 
 int FalconATCCmdMessage::Process(uchar autodisp)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("FalconATCCmdMessage::Process");
 #else
 

@@ -5,6 +5,9 @@
  of the added functionality involves Display and Mode control.
 \***************************************************************************/
 #include "stdhdr.h"
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "classtbl.h"
 #include "fsound.h"
 #include "simmover.h"
@@ -43,6 +46,10 @@ extern bool g_bRWR; // JB 010802
 // MLR 2003-11-21 Moved volume control for RWR sounds here.
 void PlayRWRSoundFX(int SfxID, int Override, float Vol, float PScale)
 {
+#ifdef FF_HEADLESS
+    // No cockpit/audio consumer in the headless process.
+#else
+
     if (g_bRealisticAvionics and SimDriver.GetPlayerAircraft())
     {
         if (IO.AnalogIsUsed(AXIS_THREAT_VOLUME) == false) // Retro 3Jan2004
@@ -67,6 +74,8 @@ void PlayRWRSoundFX(int SfxID, int Override, float Vol, float PScale)
     }
 
     F4SoundFXSetDist(SfxID, Override, Vol, PScale);
+
+#endif
 }
 
 PlayerRwrClass::PlayerRwrClass(int idx, SimMoverClass* self)
@@ -468,6 +477,10 @@ void PlayerRwrClass::AutoSelectAltitudePriority(void)
 
 void PlayerRwrClass::Display(VirtualDisplay* activeDisplay)
 {
+#ifdef FF_HEADLESS
+
+#else
+
     int i, last, drawn;
 
     if (not g_bRWR) // JB 010802
@@ -544,11 +557,17 @@ void PlayerRwrClass::Display(VirtualDisplay* activeDisplay)
     }
 
     display->CenterOriginInViewport();
+
+#endif
 }
 
 
 void PlayerRwrClass::DrawContact(DetectListElement* record)
 {
+#ifdef FF_HEADLESS
+    // No cockpit/audio consumer in the headless process.
+#else
+
     if (not g_bRWR) // JB 010802
         return;
 
@@ -668,6 +687,8 @@ void PlayerRwrClass::DrawContact(DetectListElement* record)
             (symbol >= 65)) // Cobra - Put hat on a/c special symbols
             DrawStatusSymbol(Hat);
     }
+
+#endif
 }
 
 
@@ -1217,6 +1238,10 @@ int PlayerRwrClass::IsFiltered(FalconEntity* entity)
 ///////////////////////////////////////////////////////////////////////////////
 void PlayerRwrClass::CheckEWS(void)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("Human aircraft EWS control");
+#else
+
     if (not g_bRWR) // JB 010802
         return;
 
@@ -1382,6 +1407,8 @@ void PlayerRwrClass::CheckEWS(void)
                 SaidJammer = FALSE;
         }
     }
+
+#endif
 }
 
 BOOL PlayerRwrClass::IsOn()

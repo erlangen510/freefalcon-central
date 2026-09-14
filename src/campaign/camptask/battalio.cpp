@@ -354,6 +354,9 @@ void BattalionClass::InitLocalData(Unit parent)
     supply = 100;
     last_move = 0;
     last_combat = 0;
+    // Not serialized. Match squadron initialization so supply eligibility does
+    // not depend on allocator contents after either construction or loading.
+    last_resupply_time = 0;
     SetSpottedTime(0);
     fatigue = 0;
     morale = 100;
@@ -1894,7 +1897,7 @@ int BattalionClass::StepRadar(
 
 int BattalionClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("BattalionClass::GetVehicleDeagData");
 #else
 

@@ -714,8 +714,10 @@ void AircraftClass::Init(SimInitDataClass* initData)
             }
             else
             {
-                // RV - Biker - AI start at carrier pos with higher alt
-                if (ent and ent->IsTaskForce())
+                // Carrier launch bootstrap applies only during takeoff.
+                // Airborne flights must retain their campaign position when
+                // deaggregating again later in the mission.
+                if (ent and ent->IsTaskForce() and curWaypoint->GetWPAction() == WP_TAKEOFF)
                 {
                     af->initialX =
                         ent->XPos() + 1.0f * NM_TO_FT - rand() % 12000;

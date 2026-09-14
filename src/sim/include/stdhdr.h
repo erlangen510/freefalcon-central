@@ -41,4 +41,10 @@
 #include "phyconst.h"
 #include "simlib.h"
 
+#ifdef FF_HEADLESS
+#include <cstdlib>
+extern int HeadlessTraceRandom(int value, const char* file, int line);
+#define rand() HeadlessTraceRandom((rand)(), __FILE__, __LINE__)
+#endif
+
 #endif

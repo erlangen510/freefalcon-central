@@ -3,6 +3,7 @@
 
 #include "f4vu.h"
 #include "sensclas.h"
+class AircraftClass;
 
 #define MAX_OBJECTS 100
 #define NUM_RADAR_HISTORY 4
@@ -124,6 +125,7 @@ public:
 
 class SimObjectType
 {
+    friend void RunGroundRetargetDiagnostic(AircraftClass*);
 public:
     SimObjectType(FalconEntity *baseObj);
     SimObjectType *Copy(void);

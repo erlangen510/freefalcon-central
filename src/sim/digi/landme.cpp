@@ -442,16 +442,9 @@ void DigitalBrain::Land(void)
         if ((self->curWaypoint->GetWPAction() == WP_LAND) and
             not self->IsPlayer())
         {
-            if (self->curWaypoint->GetPrevWP() not_eq NULL)
-            {
-                GridIndex abXg, abYg;
-                float abXs, abYs;
-                abObj->GetLocation(&abXg, &abYg);
-                abXs = GridToSim(abXg);
-                abYs = GridToSim(abYg);
-
-                SetTrackPoint(abXs, abYs, self->ZPos());
-            }
+            // Use simulation coordinates directly: grid XY is reversed and
+            // quantized, and can differ from a moving task force by a full cell.
+            SetTrackPoint(abObj->XPos(), abObj->YPos(), self->ZPos());
 
             dx = self->XPos() - trackX;
             dy = self->YPos() - trackY;
@@ -463,6 +456,17 @@ void DigitalBrain::Land(void)
                 RegroupAircraft(self);
                 return;
             }
+
+            // Follow the carrier position selected above. Ordinary waypoint
+            // tracking replaces it with the static landing waypoint location.
+            if (self->af->GetSimpleMode())
+                SimpleTrack(SimpleTrackSpd, af->CalcTASfromCAS(cornerSpeed) * KNOTS_TO_FTPSEC);
+            else
+            {
+                AutoTrack(maxGs);
+                MachHold(cornerSpeed, self->GetKias(), FALSE);
+            }
+            return;
         }
 
         if (self->af->GetSimpleMode())

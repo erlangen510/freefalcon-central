@@ -1,5 +1,6 @@
 #ifdef FF_HEADLESS
 #include "headless/boundary.h"
+#include "headless/detailed.h"
 #endif
 /*
  * Machine Generated source file for message "Campaign Weap Fire".
@@ -622,7 +623,7 @@ SimBaseClass *GetSimTarget(CampEntity target, uchar targetId)
 void FireOnSimEntity(CampEntity shooter, CampEntity campTarg, short weapon[],
                      uchar shots[], uchar targetId)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("combat against detailed entity");
 #else
 
@@ -658,7 +659,7 @@ void FireOnSimEntity(CampEntity shooter, CampEntity campTarg, short weapon[],
  */
 void FireOnSimEntity(CampEntity shooter, SimBaseClass *simTarg, short weaponId)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("combat against detailed entity");
 #else
 
@@ -795,7 +796,11 @@ void FireOnSimEntity(CampEntity shooter, SimBaseClass *simTarg, short weaponId)
 
         // the special effects driver will space out the damage over
         // some random time
+#ifdef FF_HEADLESS
+        QueueDetailedCampaignDamage(endMessage, damMessage);
+#else
         OTWDriver.AddSfxRequest(new SfxClass(endMessage, damMessage));
+#endif
     }
     // itsa missile
     else if (classPtr->vuClassData.classInfo_[VU_TYPE] == TYPE_MISSILE)
@@ -1161,7 +1166,8 @@ void DoShortDistanceVisualEffects(CampEntity shooter, CampEntity target,
                                   int weapon_id, int shots)
 {
 #ifdef FF_HEADLESS
-    ff_headless::unsupported("DoShortDistanceVisualEffects");
+    // Aggregate visual effects do not create physical projectiles.
+    return;
 #else
 
     WeaponClassDataType *wc;
@@ -1270,7 +1276,7 @@ void DoShortDistanceVisualEffects(CampEntity shooter, CampEntity target,
 
 void FireMissileAtSim(CampEntity shooter, SimBaseClass *simTarg, short weapId)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("FireMissileAtSim");
 #else
 
@@ -1372,6 +1378,10 @@ void FireMissileAtSim(CampEntity shooter, SimBaseClass *simTarg, short weapId)
 
     // put the missile into the world
     vuDatabase->/*Quick*/ Insert(theMissile);
+#ifdef FF_HEADLESS
+    // No camera bubble rebuild exists in the regional host; wake on insertion.
+    theMissile->Wake();
+#endif
 
     // Setting a "Rebuild immediately" flag to ensure the missile wakes ASAP.
     // NOTE: It would be nice to put things like this into a special treatment list

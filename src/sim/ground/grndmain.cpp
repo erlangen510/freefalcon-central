@@ -242,7 +242,9 @@ void GroundClass::Init(SimInitDataClass *initData)
 
     CalcTransformMatrix(this);
 
-    strength = 100.0F;
+    // SimVehicleClass initializes strength/maxStrength from vehicle HitPoints.
+    // Keep those values: replacing only strength with 100 makes the damage
+    // ratio inconsistent for both ground vehicles and ships.
 
     // Check for Campaign mode
     // we don't follow waypoints here

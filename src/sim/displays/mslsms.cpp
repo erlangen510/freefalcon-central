@@ -16,6 +16,7 @@
 #include "graphics/include/drawbsp.h"
 #include "vehicle.h"
 #include "aircrft.h"
+#include "digi.h"
 #include "fack.h"
 #include "falcmesg.h"
 #include "msginc/trackmsg.h"
@@ -632,12 +633,29 @@ void SMSBaseClass::ReplaceRocket(int station, MissileClass *theMissile)
 #endif
 
 #include "bomb.h"
+static bool RocketTargetRetired(SimObjectType *target)
+{
+    if (not target) return false; // Untargeted area fire remains valid.
+    auto *entity = target->BaseData();
+    if (entity->IsDead() or entity->IsExploding()) return true;
+    if (not entity->IsSim()) return false;
+    auto *sim = static_cast<SimBaseClass *>(entity);
+    return not sim->IsAwake() or sim->IsSetRemoveFlag() or sim->Strength() <= 0;
+}
 // MLR 1/11/2004 - LaunchRocket() returns TRUE to stop the current Salvo.
 // launchers are bombclass objects now
 // they fire missiles (and maybe other bombs later)
 int SMSClass::LaunchRocket(void)
 {
     BombClass *theLau;
+
+    if (MasterArm() not_eq Arm) return 1;
+
+    if (ownship->IsAirplane() and
+        static_cast<AircraftClass *>(ownship)->DBrain()->IsOperatorWeaponsHold())
+        return 1;
+
+    if (not ownship->GetFCC() or RocketTargetRetired(ownship->GetFCC()->TargetPtr())) return 1;
 
     theLau = (BombClass *)curWeapon.get();
 
@@ -667,6 +685,10 @@ int SMSClass::LaunchRocket(void)
 
         if (theLau and theLau->IsLauncher() and theLau->LauGetRoundsRemaining())
         {
+            // Weapon selection may clear the FCC while these rounds are queued.
+            // Keep the launch-time target with the pod until its salvo finishes.
+            if (not theLau->LauIsFiring())
+                theLau->SetTarget(ownship->GetFCC()->TargetPtr());
             theLau->LauFireSalvo(); // tell lau to add a salvo to the firecount
 
             if (theLau->LauGetRoundsRemaining() == 0)
@@ -693,6 +715,27 @@ int SMSClass::LaunchRocket(void)
 
 void SMSClass::RunRockets(void)
 {
+    if (MasterArm() not_eq Arm or (ownship->IsAirplane() and
+        static_cast<AircraftClass *>(ownship)->DBrain()->IsOperatorWeaponsHold()))
+    {
+        for (int hp = 1; hp < numHardpoints; ++hp)
+        {
+            for (SimWeaponClass *weapon = hardPoint[hp]->weaponPointer.get();
+                 weapon; weapon = weapon->GetNextOnRail())
+            {
+                if (not weapon->IsLauncher()) continue;
+                BombClass *pod = static_cast<BombClass *>(weapon);
+                // LaunchRocket discounts a pod when all its rounds are reserved.
+                // Cancellation makes its unspent rounds selectable again.
+                if (pod->LauIsFiring() and pod->LauGetRoundsRemaining() == 0 and not UnlimitedAmmo())
+                    ++hardPoint[hp]->weaponCount;
+                pod->LauCancelSalvo();
+            }
+        }
+        runRockets = 0;
+        ClearFlag(Firing);
+        return;
+    }
     if (runRockets)
     {
         SetFlag(Firing);
@@ -711,14 +754,24 @@ void SMSClass::RunRockets(void)
                 {
                     if (theLau->LauIsFiring())
                     {
-                        FireRocket(l, theLau);
-                        runRockets = 1;
+                        if (RocketTargetRetired(theLau->targetPtr))
+                        {
+                            if (theLau->LauGetRoundsRemaining() == 0 and not UnlimitedAmmo())
+                                ++hardPoint[l]->weaponCount;
+                            theLau->LauCancelSalvo();
+                        }
+                        else
+                        {
+                            FireRocket(l, theLau);
+                            runRockets = 1;
+                        }
                     }
                 }
 
                 theLau = (BombClass *)theLau->GetNextOnRail();
             }
         }
+        if (not runRockets) ClearFlag(Firing);
     }
     else
     {
@@ -748,7 +801,7 @@ void SMSClass::FireRocket(int hpId, BombClass *theLau)
         }
         else
         {
-            RemoveStore(hpId, theLau->LauGetWeaponId());
+            RemoveStore(hpId, theLau->LauGetWeaponId(),true);
         }
 
         if (theLau->drawPointer)
@@ -764,9 +817,11 @@ void SMSClass::FireRocket(int hpId, BombClass *theLau)
         hardPoint[hpId]->GetSubRotation(wpnNum, &az, &el);
 
         theMissile->SetLaunchPosition(x, y, z);
-        theMissile->SetLaunchRotation(0, 0);
+        theMissile->SetLaunchRotation(az, el);
 
-        theMissile->Start(FCC->TargetPtr());
+        theMissile->Start(theLau->targetPtr);
+        if (not theLau->LauIsFiring())
+            theLau->SetTarget(NULL);
 
         vuDatabase->/*Quick*/ Insert(theMissile);
         theMissile->Wake();

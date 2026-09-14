@@ -380,6 +380,10 @@ void HarmTargetingPod::SetDesiredTarget(SimObjectType* newTarget)
 // RV - I-Hawk - HAD display
 void HarmTargetingPod::HADDisplay(VirtualDisplay* activeDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float arrowH = 0.0375f;
     static const float arrowW = 0.0433f;
 
@@ -486,11 +490,17 @@ void HarmTargetingPod::HADDisplay(VirtualDisplay* activeDisplay)
             }
         }
     }
+
+#endif
 }
 
 // RV - I-Hawk - HAD special EXP zoom modes
 void HarmTargetingPod::HADExpDisplay(VirtualDisplay* activeDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float arrowH = 0.0375f;
     static const float arrowW = 0.0433f;
 
@@ -528,11 +538,17 @@ void HarmTargetingPod::HADExpDisplay(VirtualDisplay* activeDisplay)
             }
         }
     }
+
+#endif
 }
 
 // RV - I-Hawk - HAS video display. Showing symbols azimuth/elevation (not range)
 void HarmTargetingPod::HASDisplay(VirtualDisplay* activeDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float arrowH = 0.0375f;
     static const float arrowW = 0.0433f;
     int minutes, seconds;
@@ -644,11 +660,17 @@ void HarmTargetingPod::HASDisplay(VirtualDisplay* activeDisplay)
             }
         }
     }
+
+#endif
 }
 
 // RV - I-Hawk - Handoff display. Moving here afetr locking a target in HAS mode
 void HarmTargetingPod::HandoffDisplay(VirtualDisplay* activeDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     display = activeDisplay;
 
     // Do we draw flashing things this frame ?
@@ -721,11 +743,17 @@ void HarmTargetingPod::HandoffDisplay(VirtualDisplay* activeDisplay)
             }
         }
     }
+
+#endif
 }
 
 // RV - I-Hawk - POS mode display
 void HarmTargetingPod::POSDisplay(VirtualDisplay* activeDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     display = activeDisplay;
 
     // Do we draw flashing things this frame ?
@@ -766,11 +794,17 @@ void HarmTargetingPod::POSDisplay(VirtualDisplay* activeDisplay)
             }
         }
     }
+
+#endif
 }
 
 // RV - I-Hawk - Draw missile footprint (only in HAD mode)
 void HarmTargetingPod::DrawWEZ(MissileClass* theMissile)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float curX, curY, nextX, nextY, angleX, angleY, offsetX, offsetY;
     float cur2X, cur2Y, next2X, next2Y, stepX, stepY;
 
@@ -894,6 +928,8 @@ void HarmTargetingPod::DrawWEZ(MissileClass* theMissile)
     // Restore the default full intensity green color
     display->SetColor(0xFF00FF00);
     display->AdjustOriginInViewport(0.0f, -HTS_Y_OFFSET);
+
+#endif
 }
 
 // Make sure we have the latest data for each track, and age them if they get old
@@ -1762,6 +1798,10 @@ void HarmTargetingPod::ToggleHADZoomMode()
 // RV - I-Hawk - Draw the DTSB box
 void HarmTargetingPod::DrawDTSBBox()
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     if (zoomFactor > 1.0f) // No do in a zoom mode
     {
         return;
@@ -1779,6 +1819,8 @@ void HarmTargetingPod::DrawDTSBBox()
     display->Line(DTSBSide, DTSBTop, DTSBSide, DTSBBottom);
 
     display->SetColor(tempColor);
+
+#endif
 }
 
 void HarmTargetingPod::UpdateDTSB(int symbol, float& displayX, float& displayY)

@@ -26,6 +26,21 @@
 #include <fstream>
 #include <memory>
 #include "watch.h"
+#include "detailed.h"
+#include <random>
+
+static std::mt19937 detailedRandom;
+long HeadlessFastRandom() { return static_cast<long>(detailedRandom()); }
+
+int HeadlessTraceRandom(int value, const char* file, int line) {
+    static const bool trace = std::getenv("FF_RANDOM_TRACE") != nullptr;
+    if(trace) {
+        const char* name=strrchr(file,'/');
+        if(!name) name=strrchr(file,'\\');
+        fprintf(stderr,"[random] %s:%d %d\n",name?name+1:file,line,value);
+    }
+    return value;
+}
 
 struct UnitState { short x, y; int vehicles, supply, orders; bool flight, local; };
 using UnitStates = std::map<unsigned long long, UnitState>;
@@ -33,7 +48,7 @@ static UnitStates captureUnits() {
     UnitStates result;
     VuListIterator it(AllUnitList);
     for (Unit u = static_cast<Unit>(it.GetFirst()); u; u = static_cast<Unit>(it.GetNext())) {
-        if (!u->IsAggregate()) throw std::runtime_error("Detailed entity entered the aggregate campaign");
+        if (!u->IsAggregate() && !DetailedRegionActive()) throw std::runtime_error("Detailed entity outside managed region");
         UnitState state{}; u->GetLocation(&state.x, &state.y);
         state.vehicles = u->GetTotalVehicles(); state.supply = u->GetUnitSupply(); state.orders = u->GetUnitOrders();
         state.flight = u->IsFlight(); state.local = u->IsLocal();
@@ -44,7 +59,7 @@ static UnitStates captureUnits() {
 
 extern void DoCampaignLoop(int);
 extern void UpdateRealUnits(CampaignTime);
-extern void ReadAllRadarData();
+extern void ReadHeadlessRadarData();
 extern void ReadAllMissileData();
 extern void SetTime(unsigned long);
 extern void InitBaseLists();
@@ -95,6 +110,8 @@ static void validateData(const std::filesystem::path& data) {
 
 int RunLegacyCampaign(const std::vector<std::string>& args) {
     unsigned completedSteps = 0;
+    CampaignTime loadedTime = 0;
+    bool campaignLoaded = false;
     std::unique_ptr<CampaignWatch> watch;
     try {
         if (args.size() != 5 && args.size() != 6) { std::cerr << "{\"status\":\"error\",\"simulation_advanced\":false,\"error\":\"Usage: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\"}\n"; return 2; }
@@ -103,8 +120,9 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         if (interactive) watch = std::make_unique<CampaignWatch>(std::filesystem::absolute(std::filesystem::u8path(args[4])));
         const auto wallStart = std::chrono::steady_clock::now();
         size_t parsed = 0;
-        const int minutes = interactive ? 10080 : std::stoi(args[4], &parsed);
-        if (!interactive && parsed != args[4].size()) throw std::runtime_error("Invalid duration");
+        const bool diagnostic = args[1] == "detail-test";
+        const int minutes = interactive ? 10080 : diagnostic ? 1 : std::stoi(args[4], &parsed);
+        if (!interactive && !diagnostic && parsed != args[4].size()) throw std::runtime_error("Invalid duration");
         unsigned seed = 1;
         if (args.size() == 6) {
             const auto value = std::stoull(args[5], &parsed);
@@ -129,6 +147,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         setPath(FalconTerrainDataDir, data / "terrdata/korea");
         std::filesystem::current_path(data);
         srand(seed);
+        detailedRandom.seed(seed);
         ASD = new AS_DataClass;
         stage("class tables and campaign AI");
         ReadCampAIInputs("Falcon4");
@@ -149,7 +168,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         TheMap.Setup(terrain);
         realWeather = new WeatherClass;
         gTacanList = new TacanList;
-        ReadAllRadarData();
+        ReadHeadlessRadarData();
         ReadAllMissileData();
         stage("load campaign entities");
         if (!TheCampaign.LoadCampaign(game_Campaign, scenario)) throw std::runtime_error("Campaign load failed");
@@ -163,19 +182,29 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         { VuListIterator it(AllObjList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) ++objectiveCount; }
         fprintf(stderr, "loaded units=%d objectives=%d theater=%s scenario=%s time=%lu\n", unitCount, objectiveCount, TheCampaign.TheaterName, TheCampaign.Scenario, TheCampaign.CurrentTime);
         const CampaignTime start = TheCampaign.CurrentTime;
+        loadedTime = start; campaignLoaded = true;
         const auto before = captureUnits();
         auto previous = before;
         std::set<unsigned long long> moved, createdFlights, strengthChanged, supplyChanged, ordersChanged;
         stage("startup campaign planning");
+#ifdef FF_DETAILED_ENGINE
+        if (diagnostic) { RunDetailedDiagnostic(args[4]); std::cout.flush(); std::cerr.flush(); std::_Exit(0); }
+#endif
         DoCampaignLoop(1);
         if (watch) watch->initialize(scenario);
-        for (int second = 0; second < minutes * 60; second += 5) {
+        CampaignTime nextCampaignTick = start + 5000;
+        for (int second = 0; second < minutes * 60;) {
             if (watch && !watch->waitForStep()) break;
-            SetTime(TheCampaign.CurrentTime + 5 * CampaignSeconds);
+            const unsigned frameMs = watch ? watch->stepMilliseconds() : 5000;
+            if (DetailedRegionActive()) AdvanceDetailedFrame();
+            else SetTime(TheCampaign.CurrentTime + frameMs);
+            if (TheCampaign.CurrentTime < nextCampaignTick) continue;
+            nextCampaignTick += 5000; second += 5;
             DoCampaignLoop(0);
             UpdateRealUnits(5 * CampaignSeconds);
             TheCampaign.vuThread->Update(-1);
             gMainThread->Update(-1);
+            if (DetailedRegionActive()) ReconcileDetailedRegion();
             const auto current = captureUnits();
             for (const auto& [id, state] : current) {
                 const auto old = previous.find(id);
@@ -196,7 +225,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
                   << ",\"scenario\":" << ff::headless::JsonString(scenario)
                   << ",\"seed\":" << seed << ",\"format_version\":" << inspected.version
                   << ",\"completed_steps\":" << completedSteps << ",\"step_seconds\":5"
-                  << ",\"all_units_aggregate\":true"
+                  << ",\"all_units_aggregate\":" << (DetailedRegionActive() ? "false" : "true")
                   << ",\"objectives\":" << objectiveCount
                   << ",\"units_before\":" << before.size() << ",\"units_after\":" << previous.size()
                   << ",\"local_units\":" << local << ",\"flights_after\":" << flights
@@ -212,7 +241,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         std::_Exit(0);
     } catch (const std::exception& error) {
         if (watch) { try { watch->error(error.what()); } catch (...) {} }
-        std::cerr << "{\"status\":\"error\",\"simulation_advanced\":" << (completedSteps ? "true" : "false")
+        std::cerr << "{\"status\":\"error\",\"simulation_advanced\":" << ((completedSteps || (campaignLoaded && TheCampaign.CurrentTime != loadedTime)) ? "true" : "false")
                   << ",\"completed_steps\":" << completedSteps << ",\"error\":" << ff::headless::JsonString(error.what()) << "}" << std::endl;
         std::_Exit(1);
     }

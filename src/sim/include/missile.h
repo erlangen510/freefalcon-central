@@ -299,6 +299,9 @@ public:
         SensorLostLock = 0x4,
         FindingImpact = 0x8,
     };
+#ifdef FF_HEADLESS
+    friend unsigned VerifyRocketDispersion(MissileClass* rocket);
+#endif
 
     int Flags(void)
     {
@@ -364,6 +367,10 @@ public:
     {
         return auxData->gimbalTrackFactor;
     };
+    float GetRocketDispersionConeAngle(void) const
+    {
+        return auxData->rocketDispersionConeAngle;
+    }
     int GetLaunchSound(void)
     {
         return auxData->launchSound;
@@ -463,6 +470,8 @@ public:
     };
     BOOL FindRocketGroundImpact(float *impactX, float *impactY, float *impactZ,
                                 float *impactTime);
+    BOOL PredictRocketGroundImpact(float *impactX, float *impactY, float *impactZ,
+                                   float *impactTime);
     //MI
     bool Covered;
     bool HOC;

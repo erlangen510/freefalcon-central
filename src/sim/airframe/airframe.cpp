@@ -547,6 +547,9 @@ void AirframeClass::Reinit(void)
     {
         if (hf == NULL)
         {
+#ifdef FF_HEADLESS
+            hf = new HeliMMClass(platform, STABLE); // No player-name helicopter Easter eggs.
+#else
             if (stricmp(LogBook.Name(), "mrsteed0") == 0)
                 hf = new HeliMMClass(platform, A109);
             else if (stricmp(LogBook.Name(), "mrsteed1") == 0)
@@ -555,6 +558,7 @@ void AirframeClass::Reinit(void)
                 hf = new HeliMMClass(platform, MD500);
             else
                 hf = new HeliMMClass(platform, STABLE);
+#endif
         }
 
         hf->SetControls(0.0f, 0.0f, 0.0f, 0.0f);

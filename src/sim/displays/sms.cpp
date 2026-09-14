@@ -1,6 +1,11 @@
+#ifdef FF_HEADLESS
+#include "boundary.h"
+#include <set>
+#endif
 #include "stdhdr.h"
 #include "graphics/include/drawbsp.h"
 #include "sms.h"
+#include "digi.h"
 #include "missile.h"
 #include "misldisp.h"
 #include "misslist.h"
@@ -170,7 +175,13 @@ SMSBaseClass::SMSBaseClass(SimVehicleClass *newOwnship, short *weapId,
         hardPoint[i]->weaponId = (unsigned short)(weapId[i]);
         hardPoint[i]->weaponCount = (unsigned short)(weapCnt[i]);
 
-        if (hardPoint[i]->weaponId and hardPoint[i]->weaponCount)
+        const auto* mountedClass=hardPoint[i]->weaponId?
+            &Falcon4ClassTable[WeaponDataTable[hardPoint[i]->weaponId].Index]:nullptr;
+        const bool mountedGun=mountedClass &&
+            mountedClass->vuClassData.classInfo_[VU_TYPE]==TYPE_GUN &&
+            mountedClass->vuClassData.classInfo_[VU_CLASS]==CLASS_WEAPON;
+        // Zero gun ammunition does not remove the mounted gun itself.
+        if (hardPoint[i]->weaponId and (hardPoint[i]->weaponCount or mountedGun))
         {
             wd = &WeaponDataTable[hardPoint[i]->weaponId];
             ShiAssert(wd);
@@ -187,7 +198,26 @@ SMSBaseClass::SMSBaseClass(SimVehicleClass *newOwnship, short *weapId,
                               1;
             classPtr = &Falcon4ClassTable[wd->Index];
 
-            if (classPtr->vuClassData.classInfo_[VU_TYPE] == TYPE_GUN and
+            // Older campaign data labels some pods TYPE_ROCKET. RKT identifies
+            // their separate projectile and round count; keep the pod aboard.
+            bool legacyRocketPod = false;
+            if (classPtr->vuClassData.classInfo_[VU_TYPE] == TYPE_ROCKET and
+                SimWeaponDataTable[classPtr->vehicleDataIndex].weaponClass == wcRocketWpn)
+            {
+                for (int rocket = 0; rocket < NumRocketTypes; ++rocket)
+                    if (RocketDataTable[rocket].weaponId == hardPoint[i]->weaponId and
+                        RocketDataTable[rocket].nweaponId > 0 and
+                        RocketDataTable[rocket].weaponCount > 0)
+                        legacyRocketPod = true;
+            }
+
+            if (legacyRocketPod)
+            {
+                hardPoint[i]->weaponPointer = InitWeaponList(
+                    newOwnship, hardPoint[i]->weaponId,
+                    hardPoint[i]->GetWeaponClass(), createCount, InitABomb);
+            }
+            else if (classPtr->vuClassData.classInfo_[VU_TYPE] == TYPE_GUN and
                 classPtr->vuClassData.classInfo_[VU_CLASS] == CLASS_WEAPON)
             {
                 // This is a gun, initialize some extra data
@@ -570,6 +600,21 @@ void SMSBaseClass::SelectBestWeapon(uchar *dam, int mt, int range_km,
     int bhp = -1;
     int bw = 0, bs = 0;
     int wrange;
+
+#ifdef FF_HEADLESS
+    if(ownship->GetDomain()==DOMAIN_SEA) {
+        static std::set<std::pair<int,int>> observed;
+        if(observed.insert({ownship->Type(),range_km}).second) {
+            for(int slot=0;slot<numHardpoints;++slot) {
+                auto* hp=hardPoint[slot];if(!hp || !hp->weaponId) continue;
+                const auto& data=WeaponDataTable[hp->weaponId];
+                fprintf(stderr,"[naval-selection] actor=%lu slot=%d weapon=%s count=%d mt=%d distance=%d range=%d hit=%d score=%d allowed=%d gun_only=%d\n",
+                    ownship->Id().num_,slot,data.Name,hp->weaponCount,mt,range_km,GetWeaponRange(hp->weaponId,mt),int(data.HitChance[mt]),
+                    GetWeaponScore(hp->weaponId,dam,mt,range_km),static_cast<UnitClass*>(ownship->GetCampaignObject())->CanShootWeapon(hp->weaponId),guns_only);
+            }
+        }
+    }
+#endif
 
     for (i = 0; i < numHardpoints; i++)
     {
@@ -1328,14 +1373,14 @@ void SMSClass::AddWeaponGraphics(void)
                         {
                             BombClass *lau = (BombClass *)weapPtr;
                             int wid = lau->LauGetWeaponId();
-                            int rnds = lau->LauGetRoundsRemaining();
+                            int rnds = lau->LauGetRoundsOnboard();
                             int l;
 
                             for (l = 0; l < rnds; l++)
                             {
                                 AddStore(
                                     i, wid,
-                                    0); // rockets are not "visible" - no extra drag
+                                    0, true); // contained rounds have mass at the pod, not extra drag
                             }
                         }
 
@@ -1586,7 +1631,14 @@ void SMSClass::FreeWeaponGraphics(void)
                 else if (weapPtr->IsBomb())
                     ((BombClass *)weapPtr)->SetTarget(NULL);
 
-                RemoveStore(i, hardPoint[i]->weaponId);
+                // Mirror AddWeaponGraphics: built-in guns add tracers only;
+                // launchers add both their container and all onboard rounds.
+                if(!weapPtr->IsGun()) RemoveStore(i, hardPoint[i]->weaponId);
+                if(weapPtr->IsLauncher()) {
+                    auto* pod=static_cast<BombClass*>(weapPtr);
+                    for(int round=0;round<pod->LauGetRoundsOnboard();++round)
+                        RemoveStore(i,pod->LauGetWeaponId(),true);
+                }
 
                 if (weapPtr->drawPointer)
                 {
@@ -1679,6 +1731,17 @@ void SMSClass::Exec(void)
     }
 
     // END OF ADDED SECTION
+
+    // An explicit operator hold cancels the queued sequence, rather than
+    // merely pausing it and releasing old queued bombs after a later free.
+    if (curRippleCount and (MasterArm() not_eq Arm or (ownship->IsAirplane() and
+        static_cast<AircraftClass*>(ownship)->DBrain()->IsOperatorWeaponsHold())))
+    {
+        curRippleCount = 0;
+        nextDrop = 0;
+        ClearFlag(Firing);
+        ownship->GetFCC()->bombPickle = FALSE;
+    }
 
     // Do ripple stuff here
     if (curRippleCount and SimLibElapsedTime > nextDrop)
@@ -1836,6 +1899,10 @@ void SMSClass::Exec(void)
 
 void SMSClass::SetPlayerSMS(int flag)
 {
+#ifdef FF_HEADLESS
+if (flag) ff_headless::unsupported("Player cockpit stores display"); drawable = nullptr;
+#else
+
     if (flag and not drawable)
     {
         drawable = new SmsDrawable(this);
@@ -1846,6 +1913,8 @@ void SMSClass::SetPlayerSMS(int flag)
         delete drawable;
         drawable = NULL;
     }
+
+#endif
 }
 
 void SMSClass::FreeWeapons(void)
@@ -3549,16 +3618,16 @@ void SMSClass::DecrementBurstHeight(void)
 }
 
 //make me compatible with new rack code
-int SMSClass::JettisonStation(int stationNum, JettisonMode mode)
+bool SMSClass::CanJettisonWeapon(int station) const
 {
-    VuBin<SimWeaponClass> tempPtr, weapPtr;
+    return station>0 && station<numHardpoints && hardPoint && hardPoint[station] &&
+        hardPoint[station]->weaponPointer && !hardPoint[station]->GetGun() &&
+        (hardPoint[station]->GetRackDataFlags() bitand RDF_SELECTIVE_JETT_RACK) &&
+        JettisonFlightAllowed(SelectiveRack);
+}
 
-    // only works for valid stations with positive G's on a local machine
-    if (stationNum < 1) // MLR 3/2/2004 - changed from 0 - which is the gun
-    {
-        return 0;
-    }
-
+bool SMSClass::JettisonFlightAllowed(JettisonMode mode) const
+{
     //MI
     if (not g_bRealisticAvionics)
     {
@@ -3593,6 +3662,14 @@ int SMSClass::JettisonStation(int stationNum, JettisonMode mode)
         }
     }
 
+    return true;
+}
+
+int SMSClass::JettisonStation(int stationNum, JettisonMode mode)
+{
+    VuBin<SimWeaponClass> tempPtr, weapPtr;
+    if(stationNum<1 || stationNum>=numHardpoints || !hardPoint || !hardPoint[stationNum] ||
+       !JettisonFlightAllowed(mode)) return 0;
     if (hardPoint[stationNum]->weaponPointer or
         hardPoint[stationNum]->GetRack())
     {
@@ -3654,12 +3731,16 @@ int SMSClass::JettisonStation(int stationNum, JettisonMode mode)
 
                     // Create and add the "SFX" container
                     bsp->SetLabel("", 0xff00ff00);
+                    #ifdef FF_HEADLESS
+                    delete bsp;
+#else
                     OTWDriver.AddSfxRequest(new SfxClass(SFX_MOVING_BSP, // type
                                                          &pos, // world pos
                                                          &vec, // vector
                                                          bsp, // BSP
                                                          30.0f, // time to live
-                                                         1.0f)); // scale
+                                                         1.0f));
+#endif // scale
                 }
 
                 weapptr = weapptr->GetNextOnRail();
@@ -3696,6 +3777,14 @@ int SMSClass::JettisonStation(int stationNum, JettisonMode mode)
                     tempPtr.reset(weapPtr->GetNextOnRail());
                 }
 
+                if (weapPtr->IsLauncher())
+                {
+                    BombClass* pod = static_cast<BombClass*>(weapPtr.get());
+                    const int onboard = pod->LauGetRoundsOnboard();
+                    pod->LauCancelSalvo();
+                    for (int round = 0; round < onboard; ++round)
+                        RemoveStore(stationNum, pod->LauGetWeaponId(), true);
+                }
                 RemoveStore(stationNum, hardPoint[stationNum]->weaponId);
                 weapPtr = tempPtr;
             }
@@ -3722,12 +3811,16 @@ int SMSClass::JettisonStation(int stationNum, JettisonMode mode)
 
                 // Create and add the "SFX" container
                 rack->SetLabel("", 0xff00ff00);
-                OTWDriver.AddSfxRequest(new SfxClass(SFX_MOVING_BSP, // type
+                #ifdef FF_HEADLESS
+                    delete rack;
+#else
+                    OTWDriver.AddSfxRequest(new SfxClass(SFX_MOVING_BSP, // type
                                                      &pos, // world pos
                                                      &vec, // vector
                                                      rack, // BSP
                                                      30.0f, // time to live
-                                                     1.0f)); // scale
+                                                     1.0f));
+#endif // scale
             }
         }
 
@@ -3747,12 +3840,16 @@ int SMSClass::JettisonStation(int stationNum, JettisonMode mode)
 
                 // Create and add the "SFX" container
                 pylon->SetLabel("", 0xff00ff00);
-                OTWDriver.AddSfxRequest(new SfxClass(SFX_MOVING_BSP, // type
+                #ifdef FF_HEADLESS
+                    delete pylon;
+#else
+                    OTWDriver.AddSfxRequest(new SfxClass(SFX_MOVING_BSP, // type
                                                      &pos, // world pos
                                                      &vec, // vector
                                                      pylon, // BSP
                                                      30.0f, // time to live
-                                                     1.0f)); // scale
+                                                     1.0f));
+#endif // scale
             }
         }
 
@@ -3969,7 +4066,7 @@ void SMSClass::RipOffWeapons(float noseAngle)
     }
 }
 
-void SMSClass::AddStore(int station, int storeId, int visible)
+void SMSClass::AddStore(int station, int storeId, int visible, bool containedAmmunition)
 {
     float x, y, z;
 
@@ -3979,7 +4076,9 @@ void SMSClass::AddStore(int station, int storeId, int visible)
 
         hardPoint[station]->GetPosition(&x, &y, &z);
 
-        if (((AircraftClass *)ownship)->IsF16() and
+        if(containedAmmunition)
+            ((AircraftClass *)ownship)->af->AddWeapon(WeaponDataTable[storeId].Weight,0.0F,y);
+        else if (((AircraftClass *)ownship)->IsF16() and
             (station == 1 or station == 9))
             ((AircraftClass *)ownship)
                 ->af->AddWeapon(WeaponDataTable[storeId].Weight, 0.0F, y);
@@ -4218,7 +4317,7 @@ void SMSClass::ChooseLimiterMode(int hardpoint)
     }
 }
 
-void SMSClass::RemoveStore(int station, int storeId)
+void SMSClass::RemoveStore(int station, int storeId, bool containedAmmunition)
 {
     VehicleClassDataType *vc;
     float x, y, z;
@@ -4234,7 +4333,9 @@ void SMSClass::RemoveStore(int station, int storeId)
 
             hardPoint[station]->GetPosition(&x, &y, &z);
 
-            if (((AircraftClass *)ownship)->IsF16() and
+            if(containedAmmunition)
+                ((AircraftClass *)ownship)->af->RemoveWeapon(WeaponDataTable[storeId].Weight,0.0F,y);
+            else if (((AircraftClass *)ownship)->IsF16() and
                 (station == 2 or station == 8) and
                 storeId == gRackId_Single_Rack)
                 ((AircraftClass *)ownship)
@@ -4339,6 +4440,10 @@ VuBin<SimWeaponClass> InitWeaponList(
 // MLR 3/20/2004 - this should be a FCC class call.
 void SMSBaseClass::StepMavSubMode(bool init)
 {
+#ifdef FF_HEADLESS
+ff_headless::unsupported("Player cockpit targeting control");
+#else
+
     AircraftClass *playerAC = SimDriver.GetPlayerAircraft();
     RadarDopplerClass *theRadar =
         (RadarDopplerClass *)FindSensor(playerAC, SensorClass::Radar);
@@ -4387,6 +4492,8 @@ void SMSBaseClass::StepMavSubMode(bool init)
         theRadar->SetScanDir(1.0F);
         FCC->SetSubMode(FireControlComputer::SLAVE);
     }
+
+#endif
 }
 //MI
 

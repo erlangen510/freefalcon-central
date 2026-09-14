@@ -2343,6 +2343,16 @@ void AirframeClass::AllocateFuel(float totalfuel)
     m_tanks[TANK_REXT] = min(m_tankcap[TANK_REXT], totalfuel / 2.0f);
     totalfuel -= m_tanks[TANK_REXT];
     totalfuel -= m_tanks[TANK_LEXT];
+    // A wing tank may have been jettisoned, or the pair may have unequal
+    // capacity. Keep the balanced initial split, then use any remaining wing
+    // capacity before moving on to the centerline tank. Otherwise half the
+    // fuel disappears when only one wing tank remains.
+    for (int tank : {TANK_LEXT, TANK_REXT})
+    {
+        const float extra = min(totalfuel, m_tankcap[tank] - m_tanks[tank]);
+        m_tanks[tank] += extra;
+        totalfuel -= extra;
+    }
     m_tanks[TANK_CLINE] = min(m_tankcap[TANK_CLINE], totalfuel);
     totalfuel -= m_tanks[TANK_CLINE];
 

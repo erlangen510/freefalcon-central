@@ -17,13 +17,27 @@
 #include "scenario.h"
 #include "boundary.h"
 #include "watch.h"
+#include "detailed.h"
+#include <mmsystem.h>
 #include <sstream>
 #include <fstream>
 #include <thread>
 #include <map>
 #include <cmath>
+#include <charconv>
 
 namespace {
+std::string commandText(const std::filesystem::path& path) {
+    // Readers must not prevent the observer's atomic rename of a new command.
+    HANDLE file=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+                            nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+    if(file==INVALID_HANDLE_VALUE) return {};
+    char buffer[4097];DWORD size=0;
+    const bool read=ReadFile(file,buffer,sizeof(buffer),&size,nullptr)!=FALSE;
+    CloseHandle(file);
+    if(!read || size>4096) return {};
+    return std::string(buffer,size);
+}
 std::string id(VU_ID value) {
     return std::to_string(value.creator_) + ":" + std::to_string(value.num_);
 }
@@ -46,6 +60,7 @@ void common(std::ostream& out, CampEntity e) {
 }
 
 CampaignWatch::CampaignWatch(const std::filesystem::path& path) : directory(path) {
+    timeBeginPeriod(1);
     std::filesystem::create_directories(directory);
     // Keep diagnostics in the session; never open a second console window.
     _wfreopen((directory / "engine.log").c_str(), L"w", stderr);
@@ -67,7 +82,7 @@ void CampaignWatch::write(const char* name, const std::string& contents) {
 
 void CampaignWatch::initialize(const char* scenario) {
     std::ostringstream out;
-    out << "{\"schema\":2,\"capabilities\":{\"regional_3d\":true,\"native_detailed_combat\":false},\"scenario\":" << text(scenario) << ",\"width\":" << Map_Max_X
+    out << "{\"schema\":2,\"capabilities\":{\"regional_3d\":true,\"native_detailed_combat\":true},\"scenario\":" << text(scenario) << ",\"width\":" << Map_Max_X
         << ",\"height\":" << Map_Max_Y << ",\"cell_km\":1,\"teams\":[";
     for (int i = 0; i < NUM_TEAMS; ++i) {
         if (i) out << ',';
@@ -145,7 +160,8 @@ void CampaignWatch::initialize(const char* scenario) {
 }
 
 void CampaignWatch::command() {
-    std::ifstream in(directory / "control.txt");
+    unitAction();
+    std::istringstream in(commandText(directory / "control.txt"));
     unsigned long long seq, steps;
     int rate, pause, stop;
     if (!(in >> seq >> rate >> pause >> steps >> stop) || seq <= sequence) return;
@@ -162,11 +178,30 @@ void CampaignWatch::command() {
         active = enabled != 0;
     }
     // Enforced by the server, including clients sending an old five-field command.
-    if (active && rate > 10) rate = 10;
+    if (active != regionActive || (active && (x != regionX || y != regionY || radius != regionRadius))) {
+        SetDetailedRegion(active,x,y,radius);
+        if (active) write("regional-terrain.json",DetailedTerrainJson(x,y,radius));
+        credit=0;
+    }
+    if ((active || DetailedRegionActive()) && rate > 10) rate = 10;
     if (speed != rate || paused != bool(pause)) credit = 0;
     regionActive = active; regionX = x; regionY = y; regionRadius = radius;
     sequence = seq; speed = rate; paused = pause != 0; requestedSteps = steps; stopping = stop != 0;
     heartbeat = Clock::now();
+}
+
+void CampaignWatch::unitAction() {
+    std::istringstream in(commandText(directory / "action.txt"));
+    unsigned long long seq,creator,number;std::string seqText,creatorText,numberText,action,extra;
+    if(!(in>>seqText>>creatorText>>numberText>>action) || (in>>extra)) return;
+    auto parse=[](const std::string& text,unsigned long long& value) {
+        const auto result=std::from_chars(text.data(),text.data()+text.size(),value);
+        return result.ec==std::errc{} && result.ptr==text.data()+text.size();
+    };
+    if(!parse(seqText,seq) || !parse(creatorText,creator) || !parse(numberText,number) || seq<=actionSequence) return;
+    if(creator>UINT32_MAX || number>UINT32_MAX) return;
+    actionSequence=seq;
+    actionStatus=QueueDetailedAction(static_cast<uint32_t>(creator),static_cast<uint32_t>(number),action);
 }
 
 bool CampaignWatch::waitForStep() {
@@ -175,16 +210,19 @@ bool CampaignWatch::waitForStep() {
         auto now = Clock::now();
         double elapsed = std::chrono::duration<double>(now - last).count(); last = now;
         if (stopping || now - heartbeat > std::chrono::seconds(20)) { publish("stopped"); return false; }
-        if (now - sent >= std::chrono::milliseconds(500)) publish();
+        if (DetailedRegionActive() && speed > 10) speed = 10;
+        if (now - sent >= std::chrono::milliseconds(DetailedRegionActive() ? 100 : 500)) publish();
+        const unsigned quantum = DetailedRegionActive() ? 20 : 5000;
         if (paused) {
             credit = 0;
-            if (consumedSteps < requestedSteps) { ++consumedSteps; return true; }
+            if (!remainingStepMs && consumedSteps < requestedSteps) { ++consumedSteps; remainingStepMs = 5000; }
+            if (remainingStepMs) { nextStepMs = min(quantum,remainingStepMs); remainingStepMs -= nextStepMs; return true; }
         } else {
             consumedSteps = requestedSteps;
             credit += (elapsed < 0.5 ? elapsed : 0.5) * speed;
-            if (credit >= 5) { credit -= 5; return true; }
+            if (credit >= quantum * .001) { credit -= quantum * .001; nextStepMs=quantum; return true; }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        std::this_thread::sleep_for(std::chrono::milliseconds(DetailedRegionActive() ? 1 : 5));
     }
 }
 
@@ -192,10 +230,13 @@ void CampaignWatch::publish(const char* status) {
     std::ostringstream out;
     out << "{\"schema\":2,\"frame\":" << ++frame << ",\"status\":" << text(status)
         << ",\"time_ms\":" << TheCampaign.CurrentTime << ",\"ack\":" << sequence
+        << ",\"unit_action\":{\"ack\":"<<actionSequence<<",\"status\":"<<text(actionStatus.c_str())<<"}"
         << ",\"speed\":" << speed << ",\"paused\":" << (paused ? "true" : "false")
         << ",\"region\":{\"active\":" << (regionActive ? "true" : "false")
         << ",\"x\":" << regionX << ",\"y\":" << regionY << ",\"radius_km\":" << regionRadius
-        << ",\"combat_model\":\"aggregate\",\"native_detailed_status\":\"not_implemented\",\"projectiles_available\":false}"
+        << ",\"combat_model\":" << text(DetailedRegionActive() ? "native" : "aggregate")
+        << ",\"native_detailed_status\":" << text(DetailedRegionActive() ? "running" : "inactive") << ",\"projectiles_available\":true}"
+        << ",\"detailed\":" << DetailedSnapshotJson()
         << ",\"combat_messages\":" << ff_headless::combat.engagements << ",\"reported_losses\":" << ff_headless::combat.losses << ",\"units\":[";
     bool comma = false;
     VuListIterator it(AllUnitList);
@@ -209,6 +250,7 @@ void CampaignWatch::publish(const char* status) {
             << ",\"kind\":" << text(kind) << ",\"domain\":" << int(u->GetDomain())
             << ",\"altitude_m\":" << u->GetUnitAltitude() * 0.3048
             << ",\"heading_deg\":" << u->GetUnitHeading() * 45
+            << ",\"aggregate\":" << (u->IsAggregate() ? "true" : "false")
             << ",\"vehicles\":" << u->GetTotalVehicles() << ",\"supply\":" << u->GetUnitSupply()
             << ",\"morale\":" << u->GetUnitMorale() << ",\"orders\":" << u->GetUnitOrders()
             << ",\"mission\":" << int(u->GetUnitMission()) << ",\"destination\":[" << dx << ',' << dy << "],\"equipment\":[";

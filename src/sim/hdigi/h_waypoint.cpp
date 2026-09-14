@@ -121,8 +121,9 @@ void HeliBrain::GoToCurrentWaypoint(void)
     if (wpalt > 12000.0f)
         wpalt = 12000.0f;
 
-    // Convert to AGL
-    wpalt = wpalt - OTWDriver.GetGroundLevel(wpX, wpY);
+    // Waypoint altitude is positive MSL; terrain Z is positive down.
+    // Subtract terrain elevation (i.e. add its negative Z) to obtain AGL.
+    wpalt = wpalt + OTWDriver.GetGroundLevel(wpX, wpY);
 
     if (wpalt < 20.0f)
         wpalt = 20.0f;

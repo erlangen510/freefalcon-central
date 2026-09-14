@@ -66,6 +66,10 @@ void MissileClass::SetStatus(void)
     if (z >= groundZ and
         not(this->GetSWD()->weaponType == wtSAM and runTime < 1.0f))
     {
+#ifdef FF_HEADLESS
+        fprintf(stderr,"[missile-impact] id=%lu runtime=%.3f xyz=%.1f,%.1f,%.3f ground=%.3f theta=%.4f velocity=%.2f,%.2f,%.2f\n",
+            Id().num_,runTime,x,y,z,groundZ,theta,xdot,ydot,zdot);
+#endif
         done = FalconMissileEndMessage::GroundImpact;
         return;
     }

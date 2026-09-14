@@ -155,6 +155,7 @@ int SimFeatureClass::Wake()
         bsp = (DrawableBSP *)drawPointer;
 
         // See if we need to add smoke to smoke stacks
+#ifndef FF_HEADLESS
         if (IsSetCampaignFlag(FEAT_HAS_SMOKE_STACK))
         {
             num = bsp->GetNumSlots();
@@ -172,6 +173,7 @@ int SimFeatureClass::Wake()
             }
         }
 
+#endif
         // Is this something that needs lights turned on at night/off during the day?
         if (IsSetCampaignFlag(FEAT_HAS_LIGHT_SWITCH))
         {

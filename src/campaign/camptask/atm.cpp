@@ -588,8 +588,12 @@ int AirTaskingManagerClass::Task(void)
           continue;*/
         // END REMOVE
 
+#ifndef FF_HEADLESS
+        // Interactive frame budget only. A headless campaign tick must finish
+        // the same requests regardless of CPU load or a cold filesystem cache.
         if (GetTickCount() - task_time > 200)
             return 0;
+#endif
 
 #ifdef DEBUG_TIMING
         DWORD time = GetTickCount();

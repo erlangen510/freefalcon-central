@@ -13,6 +13,9 @@
 #include "msginc/damagemsg.h"
 #include "msginc/campweaponfiremsg.h"
 #include "aircrft.h"
+#ifdef FF_HEADLESS
+#include "boundary.h"
+#endif
 
 //sfr: added for checks
 #include "invalidbufferexception.h"
@@ -318,10 +321,29 @@ void SimWeaponClass::SendDamageMessage(FalconEntity* testObject,
             .dataPtr;
     ShiAssert(wc);
     // edg: calculate a normalized blast Dist
-    normBlastDist = (lethalRadiusSqrd - rangeSquare) / (lethalRadiusSqrd);
+    // A direct hit remains a hit for a kinetic weapon with no blast radius.
+    // Normalizing zero distance by zero radius used to produce NaN damage.
+    if (rangeSquare == 0.0f)
+        normBlastDist = 1.0f;
+    else if (lethalRadiusSqrd <= 0.0f or rangeSquare >= lethalRadiusSqrd)
+        return;
+    else
+        normBlastDist = (lethalRadiusSqrd - rangeSquare) / lethalRadiusSqrd;
 
     // quadratic dropoff
     normBlastDist *= normBlastDist;
+#ifdef FF_HEADLESS
+    // Observe every native damage request, including nearby vehicles/features,
+    // without changing eligibility, strength or message dispatch.
+    if(ff_headless::combat.trackProjectileEnds && IsMissile()) {
+        auto& audit=ff_headless::combat.projectileImpactAudit[{Id().creator_,Id().num_}];
+        auto* sim=testObject->IsSim()?static_cast<SimBaseClass*>(testObject):nullptr;
+        const bool retired=testObject->IsDead() || testObject->IsExploding() ||
+            (sim && (!sim->IsAwake() || sim->IsSetRemoveFlag() || sim->Strength()<=0));
+        if(retired) ++audit.retiredDamageRequests;
+        else ++audit.liveDamageRequests;
+    }
+#endif
 
     // Player setting damage modifier
     if (PlayerOptions.GetWeaponEffectiveness() == WEEnhanced)

@@ -31,6 +31,11 @@ void DigitalBrain::MissileEngageCheck(void)
     radModeSelect = 3;//Default
 
     angLimit = 60.0f * DTR;
+#ifdef FF_HEADLESS
+    if(targetPtr && SimLibFrameCount%250==0)
+        fprintf(stderr,"[air-gate] actor=%lu mode=%d weapon=%s range=%.1f max=%.1f ata=%.1f class=%d speed=%.1f tactic=%d track=%.0f,%.0f,%.0f wing=%d ground_avoid=%d spiked=%d profile=%d\n",
+            self->Id().num_,int(curMode),curMissile?curMissile->GetWCD()->Name:"none",targetData->range,maxAAWpnRange,targetData->ata*RTD,self->CombatClass(),self->GetVt(),bvrCurrTactic,trackX,trackY,trackZ,isWing,int(groundAvoidNeeded),int(spiked),int(bvrCurrProfile));
+#endif
 
     /*-----------------------*/
     /* return if null target */
@@ -119,7 +124,13 @@ void DigitalBrain::MissileEngage(void)
     }
 
     // Set up for missile engage
-    if (curMode not_eq lastMode) //only go into missile mode the first time
+    // Rejoin/weapon orders can return the FCC to navigation while the brain
+    // remains in MissileEngageMode. Restore its weapon mode in that case too;
+    // otherwise valid AI fire requests never reach SMS missile release.
+    if (curMode not_eq lastMode or
+        (self->FCC->GetMasterMode() not_eq FireControlComputer::Missile and
+         self->FCC->GetMasterMode() not_eq FireControlComputer::Dogfight and
+         self->FCC->GetMasterMode() not_eq FireControlComputer::MissileOverride))
     {
         FireControlComputer::FCCSubMode newSubMode;
 

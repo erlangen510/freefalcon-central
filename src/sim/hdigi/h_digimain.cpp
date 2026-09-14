@@ -162,6 +162,11 @@ void HeliBrain::SetTarget(SimObjectType* newTarget)
 
 void HeliBrain::ClearTarget(void)
 {
+    // A solution belongs to this target acquisition. Reacquiring even the
+    // same entity must not reuse a previous acquisition's cached trajectory.
+    rocketAimValid = false;
+    rocketAimNextUpdate = 0;
+    rocketAimTarget = FalconNullId;
     if (targetPtr)
     {
         targetPtr->Release();

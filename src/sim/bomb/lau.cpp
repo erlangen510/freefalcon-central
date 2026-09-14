@@ -194,3 +194,11 @@ int BombClass::LauIsFiring(void)
 {
     return (lauRounds > 0 and lauFireCount > 0);
 }
+
+void BombClass::LauCancelSalvo(void)
+{
+    // Reserved rounds remain aboard. Only FireRocket consumes ammunition.
+    lauFireCount = 0;
+    lauTimer = 0;
+    SetTarget(NULL);
+}

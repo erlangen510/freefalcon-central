@@ -1,4 +1,8 @@
 #include "stdhdr.h"
+#include "classtbl.h"
+#ifdef FF_HEADLESS
+#include <map>
+#endif
 #include "mesg.h"
 #include "guns.h"
 #include "graphics/include/drawsgmt.h"
@@ -32,6 +36,27 @@
 extern float g_fTracerAccuracyFactor; // 2002-03-12
 extern bool g_bToggleAAAGunFlag; // 2002-03-12
 extern bool g_bFireOntheMove; // FRB - Test
+
+// Headless diagnostics preserve native rejection gates and identify the first
+// few naval failures at each site without changing weapon decisions.
+static BOOL WeaponRejected(GroundClass* actor, const char* function, int line)
+{
+#ifdef FF_HEADLESS
+    static std::map<int, unsigned> observations;
+    if(actor->isShip && observations[line]++ < 3) {
+        auto* weapon=actor->Sms->GetCurrentWeapon();
+        fprintf(stderr,"[naval-gate] actor=%lu function=%s line=%d weapon=%d target=%lu range=%.1f\n",
+            actor->Id().num_,function,line,weapon?weapon->Type():0,
+            actor->targetPtr?actor->targetPtr->BaseData()->Id().num_:0,
+            actor->targetPtr?actor->targetPtr->localData->range:0);
+        if(weapon && weapon->IsMissile()) {
+            auto* data=static_cast<MissileClass*>(weapon)->GetWCD();
+            fprintf(stderr,"[naval-gate] missile=%s maxalt=%d naval_hit=%d range_km=%d\n",data->Name,int(data->MaxAlt),int(data->HitChance[Naval]),int(data->Range));
+        }
+    }
+#endif
+    return FALSE;
+}
 
 /*
 ** WeaponKeepAlive is called for servicing weapons on non-execed
@@ -177,14 +202,14 @@ BOOL GroundClass::DoWeapons(void)
     //theWeapon.reset(Sms->GetCurrentWeapon());
     if (not theWeapon)
     {
-        return FALSE;
+        return WeaponRejected(this, __func__, __LINE__);
     }
 
     // RV - Biker - Don't do missiles when heavy damaged
-    //if (theWeapon->IsMissile() and pctStrength < 0.5f) { return FALSE; }
+    //if (theWeapon->IsMissile() and pctStrength < 0.5f) { return WeaponRejected(this, __func__, __LINE__); }
 
     // RV - Biker - Don't do guns when heavy damaged
-    //if (theWeapon->IsGun() and pctStrength < 0.0f) { return FALSE; }
+    //if (theWeapon->IsGun() and pctStrength < 0.0f) { return WeaponRejected(this, __func__, __LINE__); }
 
     if (theWeapon->IsGun())
     {
@@ -385,7 +410,7 @@ BOOL GroundClass::DoWeapons(void)
         }
     }
 
-    return FALSE; // We didn't take a shot
+    return WeaponRejected(this, __func__, __LINE__); // We didn't take a shot
 }
 
 void GroundClass::RotateTurret(void)
@@ -498,7 +523,7 @@ int GroundClass::GunTrack(void)
     target = targetPtr->BaseData();
 
     if (not target)
-        return FALSE;
+        return WeaponRejected(this, __func__, __LINE__);
 
     // make guns less accurate by randomizing target position when in air, unless its AAA
     // 2000-10-19 MODIFIED BY S.G. NEW TEST FOR AAA AND REGULAR GUNS. IF FIRST BIT OF NEW FIELD IS A 1, IT'S AN AAA GUN.
@@ -581,7 +606,7 @@ int GroundClass::GunTrack(void)
     {
         // Check our limits
         if (el > 85 * DTR or (el < 5 * DTR and not target->OnGround()))
-            return FALSE;
+            return WeaponRejected(this, __func__, __LINE__);
 
         delta = (float)fabs(GetDOFValue(AIRDEF_AZIMUTH) - az);
 
@@ -589,7 +614,7 @@ int GroundClass::GunTrack(void)
             delta -= 180.0F * DTR;
 
         if (delta > 15 * DTR)
-            return FALSE;
+            return WeaponRejected(this, __func__, __LINE__);
 
         delta = (float)fabs(GetDOFValue(AIRDEF_ELEV) - el);
 
@@ -597,7 +622,7 @@ int GroundClass::GunTrack(void)
             delta -= 180.0F * DTR;
 
         if (delta > 15 * DTR)
-            return FALSE;
+            return WeaponRejected(this, __func__, __LINE__);
     }
 
     // KCK: I've noticed some vehicles (ie: artillery) don't use/have DOFs.
@@ -657,7 +682,7 @@ int GroundClass::GunTrack(void)
                 maxFireRange = float(wc->MaxAlt * KM_TO_FT * 0.666f);
 
             if (targetPtr->localData->range > maxFireRange)
-                return FALSE;
+                return WeaponRejected(this, __func__, __LINE__);
         }
 
         // edg: not really the best place for this, but....
@@ -668,7 +693,7 @@ int GroundClass::GunTrack(void)
             targetPtr->BaseData()->IsSim() and
             targetPtr->BaseData()->ZPos() - ZPos() > -2000.0f)
         {
-            return FALSE;
+            return WeaponRejected(this, __func__, __LINE__);
         }
 
         needKeepAlive = TRUE;
@@ -780,7 +805,7 @@ int GroundClass::MissileTrack(void)
     // RV - Biker - Think here is a problem
     // FRB - Increased VT = 1 to VT = 3, same as GMT threshold
     if (not isShip and (GetVt() > 3.0f and not g_bFireOntheMove))
-        return FALSE;
+        return WeaponRejected(this, __func__, __LINE__);
 
     // check for radar-guided missiles
     if (theMissile->sensorArray)
@@ -794,7 +819,7 @@ int GroundClass::MissileTrack(void)
 
             // if we don't have a fire control radar, don't launch
             if (not battalionFireControl)
-                return FALSE;
+                return WeaponRejected(this, __func__, __LINE__);
 
             // Shoot at our fire control radar's target
             // (Kinda annoying to go to the trouble of picking a target for this vehicle,
@@ -814,13 +839,13 @@ int GroundClass::MissileTrack(void)
                     SensorClass::SensorTrack and
                 (rand() % 1000 >=
                  (4 - gai->skillLevel) * (4 - gai->skillLevel) * 10))
-                return FALSE;
+                return WeaponRejected(this, __func__, __LINE__);
 
             // END OF ADDED SECTION
 
             // Make sure we still have a target after all the above contortions
             if (not targetPtr)
-                return FALSE;
+                return WeaponRejected(this, __func__, __LINE__);
         }
         break;
 
@@ -832,7 +857,7 @@ int GroundClass::MissileTrack(void)
             if (not((IrstClass*)theMissile->sensorArray[0])
                        ->CanDetectObject(targetPtr))
             {
-                return FALSE;
+                return WeaponRejected(this, __func__, __LINE__);
             }
         }
         break;
@@ -929,42 +954,45 @@ int GroundClass::MissileTrack(void)
     if (not target->OnGround())
     {
         if (maxAlt == 0.0f)
-            return FALSE;
+            return WeaponRejected(this, __func__, __LINE__);
 
         // edg: I'm leaving these in for now, however this should all be
         // moved into weapon selection.  I've commented them out in guns.
         if (zft < maxAlt or zft > minAlt)
-            return FALSE;
+            return WeaponRejected(this, __func__, __LINE__);
 
         // if (targetPtr->localData->range > wc->Range*KM_TO_FT /*or targetPtr->localData->range < wc->Range*KM_TO_FT*0.1F */)
-        // return FALSE;
+        // return WeaponRejected(this, __func__, __LINE__);
         if (targetPtr->localData->range >
             theMissile->GetRMax(-target->ZPos(), 0, targetPtr->localData->az,
                                 targetPtr->BaseData()->GetVt(),
                                 targetPtr->localData->ataFrom))
-            return FALSE;
+            return WeaponRejected(this, __func__, __LINE__);
 
         if (auxData)
         {
             if (targetPtr->localData->range <
                 auxData
                     ->MinEngagementRange) // 2002-03-09 MODIFIED BY S.G. Uses the MISSILES data file, more granular than the radar data file
-                return FALSE;
+                return WeaponRejected(this, __func__, __LINE__);
         }
 
         // SCR 11/20/98  Lets let the seeker and kinematics deal with this...
         /*
          // Check for aspect (KCK WARNING: This assumes ataFrom is -PI to PI, not 0 to 2*PI
          if (wc->Flags bitand WEAP_FRONT_ASPECT and fabs(targetPtr->localData->ataFrom) > 90*DTR)
-         return FALSE;
+         return WeaponRejected(this, __func__, __LINE__);
          if (wc->Flags bitand WEAP_REAR_ASPECT and fabs(targetPtr->localData->ataFrom) < 90*DTR)
-         return FALSE;
+         return WeaponRejected(this, __func__, __LINE__);
         */
     }
     // target on ground
-    else if (maxAlt not_eq 0.0f or
+    // Naval missiles such as SS-N-2 have nonzero MaxAlt in the original WCD
+    // despite an explicit naval hit capability. MaxAlt alone cannot classify
+    // a sea target as unsupported; retain the native range and tracking gates.
+    else if ((target->GetDomain() == DOMAIN_SEA ? wc->HitChance[Naval] == 0 : maxAlt not_eq 0.0f) or
              targetPtr->localData->range > wc->Range * KM_TO_FT)
-        return FALSE;
+        return WeaponRejected(this, __func__, __LINE__);
 
     // az and el are relative from our vehicles orientation so subtract
     // out yaw and pitch
@@ -1018,10 +1046,10 @@ int GroundClass::MissileTrack(void)
 #if 0
 
     if (fabs(DOFData[0] - az) > 45 * DTR)
-        return FALSE;
+        return WeaponRejected(this, __func__, __LINE__);
 
     if (fabs(DOFData[1] - el) > 45 * DTR)
-        return FALSE;
+        return WeaponRejected(this, __func__, __LINE__);
 
 #else
     SetDOF(AIRDEF_ELEV, el);

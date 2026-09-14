@@ -123,32 +123,10 @@ void DigitalBrain::MissileDefeatCheck(void)
             SimLibElapsedTime)
         {
             //We have spoofed the missile, now forget about it
-            // Cobra - Destroy the missile
-            if (missileFiredEntity)
-            {
-                ((SimWeaponClass *)missileFiredEntity)
-                    ->SetFlag(MissileClass::SensorLostLock);
-                ((SimWeaponClass *)missileFiredEntity)
-                    ->SetFlag(MissileClass::ClosestApprch);
-                ((SimWeaponClass *)missileFiredEntity)->SetExploding(TRUE);
-                ((SimWeaponClass *)missileFiredEntity)->SetDead(TRUE);
-            }
-
-            if (self->incomingMissile[0])
-            {
-                self->incomingMissile[0]->SetFlag(MissileClass::SensorLostLock);
-                self->incomingMissile[0]->SetFlag(MissileClass::ClosestApprch);
-                self->incomingMissile[0]->SetExploding(TRUE);
-                self->incomingMissile[0]->SetDead(TRUE);
-            }
-            else if (self->incomingMissile[1])
-            {
-                self->incomingMissile[1]->SetFlag(MissileClass::SensorLostLock);
-                self->incomingMissile[1]->SetFlag(MissileClass::ClosestApprch);
-                self->incomingMissile[1]->SetExploding(TRUE);
-                self->incomingMissile[1]->SetDead(TRUE);
-            }
-
+            // A receding threat can leave the aircraft's evasion queue, but
+            // the aircraft must not delete it (or its own outgoing missile).
+            // The missile continues native guidance/flight until its normal
+            // termination sends the end event and releases guidance channels.
             self->SetIncomingMissile(NULL);
             self->incomingMissileRange = 500 * NM_TO_FT; //initialize
             return;

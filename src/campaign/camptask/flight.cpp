@@ -4651,7 +4651,7 @@ int FlightClass::HasAreaJamming(void)
 
 int FlightClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("FlightClass::GetVehicleDeagData");
 #else
 
@@ -5190,7 +5190,7 @@ class SmsClass;
 // This function is intended to be called from the Sim Thread ONLY
 void RegroupAircraft(AircraftClass *ac)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("RegroupAircraft");
 #else
 

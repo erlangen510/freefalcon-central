@@ -37,6 +37,9 @@
 #include "missile.h"
 #include "team.h"
 #include "profiler.h" // MLR 5/21/2004 -
+#ifdef FF_HEADLESS
+#include "boundary.h"
+#endif
 
 // Marco Edit for AIM9s in Slave mode
 #include "aircrft.h"
@@ -305,7 +308,11 @@ void MissileClass::Init(void)
         {
         case DisplayBW:
         case DisplayIR:
+            #ifdef FF_HEADLESS
+            display = NULL; // The seeker still runs; its cockpit video display does not.
+#else
             display = new MaverickDisplayClass(this);
+#endif
             break;
 
         case DisplayHTS:
@@ -325,6 +332,10 @@ void MissileClass::Init(void)
         }
 
         // edg: total hack here.
+#ifdef FF_HEADLESS
+        if(parent && parent->GetDomain()==DOMAIN_SEA)
+            fprintf(stderr,"[naval-native-data] seeker=%d active_ttg=%.1f radar=%d subtype=%d\n",inputData->seekerType,inputData->mslActiveTtg,GetRadarType(),int(((VuEntityType*)classPtr)->classInfo_[VU_STYPE]));
+#endif
         if (((VuEntityType*)classPtr)->classInfo_[VU_STYPE] ==
             STYPE_MISSILE_SURF_SURF)
         {
@@ -589,7 +600,7 @@ int MissileClass::Exec(void)
                 ifd->stage2gone = true;
             }
 
-            if (((DrawableBSP*)drawPointer)->GetNumSwitches() > 0)
+            if (drawPointer and ((DrawableBSP*)drawPointer)->GetNumSwitches() > 0)
             {
                 if (ifd and ifd->stage2gone)
                 {
@@ -609,7 +620,7 @@ int MissileClass::Exec(void)
             {
                 if (runTime > auxData->deployableWingsTime)
                 {
-                    if (((DrawableBSP*)drawPointer)->GetNumSwitches() > 0)
+                    if (drawPointer and ((DrawableBSP*)drawPointer)->GetNumSwitches() > 0)
                     {
                         ((DrawableBSP*)drawPointer)->SetSwitchMask(0, 1);
                     }
@@ -1391,6 +1402,44 @@ void MissileClass::ApplyProximityDamage(void)
         }
     }
 
+#ifdef FF_HEADLESS
+    if (parent && parent->IsHelicopter() && targetPtr) {
+        auto* target=targetPtr->BaseData();
+        auto* sim=target->IsSim()?static_cast<SimBaseClass*>(target):nullptr;
+        fprintf(stderr,"[rocket-impact-target] missile=%lu target=%lu strength=%.2f dead=%d awake=%d dx=%.1f dy=%.1f radius=%.1f\n",Id().num_,target->Id().num_,sim?sim->Strength():-1,target->IsDead(),sim?sim->IsAwake():-1,target->XPos()-XPos(),target->YPos()-YPos(),sqrt(lethalRadiusSqrd));
+    }
+    if(ff_headless::combat.trackProjectileEnds) {
+        auto& audit=ff_headless::combat.projectileImpactAudit[{Id().creator_,Id().num_}];
+        audit.observed=true;
+        audit.time=SimLibElapsedTime;
+        audit.groundImpact=done==FalconMissileEndMessage::GroundImpact || ZPos()>groundZ;
+        audit.lethalRadiusSquared=lethalRadiusSqrd;
+        // Independent inventory scan: a zero request count alone cannot prove
+        // the native combined-list damage loop did not omit a live neighbor.
+        auto countNearby=[&](auto* list) {
+            VuListIterator objects(list);
+            for(auto* e=objects.GetFirst();e;e=objects.GetNext()) {
+                auto* sim=static_cast<SimBaseClass*>(e);
+                if(sim==this || sim->IsMissile() || sim->IsBomb() || !sim->IsAwake() ||
+                   sim->IsDead() || sim->IsExploding() || sim->IsSetRemoveFlag() || sim->Strength()<=0) continue;
+                const float dx=sim->XPos()-XPos(),dy=sim->YPos()-YPos(),dz=sim->ZPos()-ZPos();
+                if(dx*dx+dy*dy+(sim->OnGround()?0:dz*dz)<lethalRadiusSqrd) ++audit.liveNearbyObjects;
+            }
+        };
+        countNearby(SimDriver.objectList);countNearby(SimDriver.featureList);
+        if(targetPtr) {
+            auto* target=targetPtr->BaseData();
+            auto* sim=target->IsSim()?static_cast<SimBaseClass*>(target):nullptr;
+            const float dx=target->XPos()-XPos(),dy=target->YPos()-YPos(),dz=target->ZPos()-ZPos();
+            audit.targetKnown=true;
+            audit.targetCreator=target->Id().creator_;audit.targetNumber=target->Id().num_;
+            audit.targetRangeSquared=dx*dx+dy*dy+(target->OnGround()?0:dz*dz);
+            audit.targetStrength=sim?sim->Strength():0;
+            audit.targetRetired=target->IsDead() || target->IsExploding() ||
+                (sim && (!sim->IsAwake() || sim->IsSetRemoveFlag() || sim->Strength()<=0));
+        }
+    }
+#endif
     if (done == FalconMissileEndMessage::GroundImpact or ZPos() > groundZ)
     {
         int groundType;
@@ -1531,131 +1580,45 @@ void MissileClass::ApplyProximityDamage(void)
 ** guidance isn't tested ) until it impacts ground.
 ** Returns TRUE if resolution found and sets impact x,y,z
 */
+// Detached native flight integration. No VU insertion, seeker, damage or
+// terminal processing; prediction does not advance the campaign clock.
+BOOL MissileClass::PredictRocketGroundImpact(float* impactX, float* impactY,
+                                             float* impactZ, float* impactTime)
+{
+    if (!parent || !parent->IsSim() || !impactX || !impactY || !impactZ || !impactTime ||
+        !(SimLibMinorFrameTime > 0.0f)) return FALSE;
+    *impactTime = 0.0f;
+    VuBin<MissileClass> probe(new MissileClass(Type()));
+    probe->SetCountry(parent->GetCountry());
+    probe->SetParent(parent.get());
+    probe->SetFlag(MOTION_MSL_AI);
+    probe->Init();
+    probe->SetLaunchPosition(initXLoc, initYLoc, initZLoc);
+    probe->SetLaunchRotation(initAz, initEl);
+    probe->flags or_eq FindingImpact;
+    probe->ifd = new MissileInFlightData;
+    probe->Init1();
+    probe->CommandGuide();
+    probe->launchState = Launching;
+    for (int step=0; step<10000 && probe->runTime<60.0f; ++step)
+    {
+        probe->CommandGuide();
+        probe->FlyMissile();
+        probe->SetVuPosition();
+        if (!_finite(probe->x) || !_finite(probe->y) || !_finite(probe->z)) return FALSE;
+        const float terrainZ=OTWDriver.GetGroundLevel(probe->x,probe->y);
+        if (probe->z >= terrainZ)
+        {
+            *impactX=probe->x; *impactY=probe->y; *impactZ=terrainZ;
+            *impactTime=probe->runTime;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 BOOL MissileClass::FindRocketGroundImpact(float* impactX, float* impactY,
                                           float* impactZ, float* impactTime)
 {
-    //float saveMinorFrameTime; // FRB
-    float lastx = x, lasty = y, lastz = z;
-
-    // Cobra test
-    static FILE* fp = NULL;
-    //if (fp == NULL)
-    // fp = fopen("G:/RocketImpact.txt", "w");
-
-    /*
-     // edg: yuck.  Unfortuantely we have to do this
-     ifd = new MissileInFlightData;
-
-     // init stuff and save vars we need to set back at end....
-     runTime = 0.0f;
-     saveMinorFrameTime = SimLibMinorFrameTime;
-
-     initXLoc = 0.0f;
-     initYLoc = 0.0f;
-     initZLoc = 0.0f;
-     initAz = 0.0f;
-     initEl = 0.0f;
-
-     SimLibMinorFrameTime = 0.05f;
-
-     // Start stuff....
-       Init1();
-     launchState = Launching;
-
-     // Exec Stuff
-     // runtime updated in fly missile
-     // keep flying up until a max time or until the ground is hit
-     while ( runTime < TIME_TO_RUN_IMPACT )
-     {
-      // not sure if this is needed
-             //CalcTransformMatrix(this);
-
-     //MI fix for rocket recticle bouncing... these 3 lines where commented....
-     lastx = x;
-     lasty = y;
-     lastz = z;
-
-      // flies the thing
-             CommandGuide(); // TODO: Avoid this -- all it does for rockets is set the G commands to 1.0
-
-      flags or_eq FindingImpact; // MLR 1/9/2004 - added to prevent the rocket's launch smoke puff trail when selected
-             FlyMissile();
-      flags and_eq compl FindingImpact;
-
-             ClosestApproach(); // TODO: Avoid this -- it's only really meaningful for proximity fuzed weapons
-             SetPosition (x, y, z);
-
-      if ( launchState == InFlight )
-      {
-                SetDelta(xdot, ydot, zdot);
-                SetYPR(psi, theta, phi);
-                SetYPRDelta (r, q, p);
-     // sfr: no more
-                //SetVt(vt);
-
-     groundZ = OTWDriver.GetGroundLevel( x, y );
-     if ( z > groundZ )
-       break;
-      }
-     }
-
-     *impactTime = runTime;
-
-     float degpsi = psi * RTD;
-     float degphi = phi * RTD;
-     float degtheta = theta * RTD;
-
-
-     // restore stuff
-     runTime = 0.0f;
-     GuidenceTime = 0.0f;
-     SimLibMinorFrameTime = saveMinorFrameTime;
-        launchState = PreLaunch;
-     delete ifd;
-     ifd = NULL;
-
-     // check for no resolution
-     if ( *impactTime >= TIME_TO_RUN_IMPACT )
-     return FALSE;
-
-     // at this point we've hit the ground
-      // Interpolate for the time
-      float delta = (groundZ - lastz) / (z - lastz);
-      *impactX = lastx + delta * (x - lastx);
-      *impactY = lasty + delta * (y - lasty);
-      *impactZ = OTWDriver.GetGroundLevel(*impactX, *impactY);
-
-    */
-
-    float rng = fabs(
-        (static_cast<SimVehicleClass*>(parent.get())->ZPos() -
-         OTWDriver.GetGroundLevel(x, y)) /
-        (tan(static_cast<SimVehicleClass*>(parent.get())->Pitch() - 0.01f)));
-    float dx = sin(static_cast<SimVehicleClass*>(parent.get())->Yaw()) * rng;
-    float dy = cos(static_cast<SimVehicleClass*>(parent.get())->Yaw()) * rng;
-    *impactX = dx + static_cast<SimVehicleClass*>(parent.get())->XPos();
-    *impactY = dy + static_cast<SimVehicleClass*>(parent.get())->YPos();
-    *impactZ = OTWDriver.GetGroundLevel(*impactX, *impactY);
-
-    if ((fp) and (rng < 11000.f))
-    {
-        float dz =
-            *impactZ - static_cast<SimVehicleClass*>(parent.get())->ZPos();
-        float pel = static_cast<SimVehicleClass*>(parent.get())->Pitch() * RTD;
-        float paz = static_cast<SimVehicleClass*>(parent.get())->Yaw() * RTD;
-        float PipAz = ((float)atan2(dx, dy) * RTD) - paz;
-        float PipEl =
-            ((float)atan(-dz / (float)sqrt(dx * dx + dy * dy + .1F)) * RTD) -
-            pel;
-
-        //fprintf(fp,"**--** Rng %f Imp X %f Imp Y %f Imp Z %f Pitch %f Yaw %f pel %f paz %f PipEl %f PipAz %f dx %f dy %f dz %f \n",
-        fprintf(fp,
-                "**--** Rng %f Imp X %f Imp Y %f Imp Z %f pel %f paz %f PipEl "
-                "%f PipAz %f dx %f dy %f dz %f \n",
-                rng, dx, dy, dz, pel, paz, PipEl, PipAz, dx, dy, dz);
-        //rng, *impactX, *impactY, *impactZ, degtheta, degpsi, pel, paz, PipEl, PipAz, dx, dy, dz);
-        fflush(fp);
-    }
-
-    return TRUE;
+    return PredictRocketGroundImpact(impactX, impactY, impactZ, impactTime);
 }

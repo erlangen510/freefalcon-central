@@ -97,6 +97,20 @@ SimObjectType **TP = NULL;
 
 void DigitalBrain::GroundAttackMode(void)
 {
+    // Retired components must be released even during shot cooldown, before
+    // any bomb/rocket/gun/missile setup can consume an obsolete target.
+    auto* target = groundTargetPtr ? groundTargetPtr->BaseData() : NULL;
+    if (target and (target->IsDead() or target->IsExploding() or
+        (target->IsSim() and
+         (not static_cast<SimBaseClass*>(target)->IsAwake() or
+          static_cast<SimBaseClass*>(target)->IsSetRemoveFlag() or
+          static_cast<SimBaseClass*>(target)->pctStrength <= 0.0f))))
+    {
+        SetGroundTarget(NULL);
+        ClearFlag(MslFireFlag bitor GunFireFlag);
+        self->FCC->releaseConsent = FALSE;
+        return;
+    }
     FireControlComputer *FCC = self->FCC;
     SMSClass *Sms = self->Sms;
     RadarClass *theRadar = (RadarClass *)FindSensor(self, SensorClass::Radar);
@@ -4093,6 +4107,19 @@ void DigitalBrain::DropGBU(float approxRange, float ata, RadarClass *theRadar)
 
 void DigitalBrain::FireAGMissile(float approxRange, float ata)
 {
+    // A component can sleep/retire after selection but before release.
+    // Clear an earlier request as well, so it cannot survive target retirement.
+    FalconEntity* target = groundTargetPtr ? groundTargetPtr->BaseData() : NULL;
+    if (not target or target->IsDead() or target->IsExploding() or
+        (target->IsSim() and
+         (not static_cast<SimBaseClass*>(target)->IsAwake() or
+          static_cast<SimBaseClass*>(target)->IsSetRemoveFlag() or
+          static_cast<SimBaseClass*>(target)->pctStrength <= 0.0f)))
+    {
+        SetGroundTarget(NULL);
+        ClearFlag(MslFireFlag);
+        return;
+    }
     SMSClass *Sms = self->Sms;
 
     //F4Assert ( not Sms->curWeapon or Sms->curWeapon->IsMissile());

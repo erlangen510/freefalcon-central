@@ -301,6 +301,22 @@ void DigitalBrain::FollowWaypoints(void)
 }
 
 
+// Campaign movement does not change altitude for WPF_HOLDCURRENT. Preserve
+// the entry altitude in detailed flight as well; a zero stored altitude on a
+// hold waypoint is not an instruction to dive to the surface.
+float DigitalBrain::ResolveWaypointAltitude(WayPointClass* waypoint, float altitude)
+{
+    if (!waypoint || !(waypoint->GetWPFlags() bitand WPF_HOLDCURRENT)) {
+        altitudeHoldWaypoint = nullptr;
+        return altitude;
+    }
+    if (waypoint != altitudeHoldWaypoint) {
+        altitudeHoldWaypoint = waypoint;
+        waypointHeldAltitude = self->ZPos();
+    }
+    return waypointHeldAltitude;
+}
+
 void DigitalBrain::SimpleGoToCurrentWaypoint(void)
 {
     float xerr, yerr;
@@ -333,6 +349,7 @@ void DigitalBrain::SimpleGoToCurrentWaypoint(void)
     {
         float tx, ty, tz;
         self->curWaypoint->GetLocation(&tx, &ty, &tz);
+        tz = ResolveWaypointAltitude(self->curWaypoint, tz);
         SetTrackPoint(tx, ty, tz);
 
         // Adjust position to avoid collision near waypoint
@@ -609,6 +626,7 @@ void DigitalBrain::GoToCurrentWaypoint(void)
     }
 
     self->curWaypoint->GetLocation(&wpX, &wpY, &wpZ);
+    wpZ = ResolveWaypointAltitude(self->curWaypoint, wpZ);
     SetTrackPoint(wpX, wpY, wpZ);
 
     if (curMode not_eq lastMode)
@@ -894,7 +912,7 @@ void DigitalBrain::SelectNextWaypoint(void)
 
         // JB 010715 If the Digi has a ground target it may switch
         // between the second to last and last waypoint continuously.
-        groundTargetPtr = NULL;
+        SetGroundTarget(NULL);
 
         wlist = self->waypoint;
         waypointIndex = 0;

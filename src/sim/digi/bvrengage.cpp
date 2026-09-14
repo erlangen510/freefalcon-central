@@ -739,7 +739,14 @@ void DigitalBrain::ChoiceProfile(void)
             campBaseObj = (CampBaseClass *)targetPtr->BaseData();
 
         if (campBaseObj)
-            targetstrength = campBaseObj->NumberOfComponents();
+        {
+            // Aggregate flights have no simulation components. Preserve their
+            // actual numerical strength when a target crosses the sim boundary.
+            if (campBaseObj->IsAggregate() and campBaseObj->IsUnit())
+                targetstrength = static_cast<UnitClass*>(campBaseObj)->GetTotalVehicles();
+            else
+                targetstrength = campBaseObj->NumberOfComponents();
+        }
 
         int ownstrength = self->GetCampaignObject()->NumberOfComponents();
 
@@ -761,7 +768,7 @@ void DigitalBrain::ChoiceProfile(void)
             threatScore += 5;
 
         //who has speed advantage
-        if (((AircraftClass *)targetPtr->BaseData())->GetKias() >
+        if (targetPtr->BaseData()->GetKias() >
             self->GetKias())
             threatScore += 5;
 
@@ -3003,6 +3010,9 @@ void DigitalBrain::BaseLineIntercept(void)
         {
             SetTrackPoint(targetPtr->BaseData()->XPos(),
                           trackY = targetPtr->BaseData()->YPos());
+            // Reset only after sampling the target. Resetting every frame
+            // prevents the countdown from expiring and freezes pursuit.
+            reactiont = 3.0f;
         }
 
         float wpX, wpY, wpZ = 4000.0f;
@@ -3013,7 +3023,6 @@ void DigitalBrain::BaseLineIntercept(void)
         trackZ = min(max(targetPtr->BaseData()->ZPos() - 10000.0f, wpZ),
                      targetPtr->BaseData()->ZPos() + 10000.0f);
         StickandThrottle(-1, trackZ);
-        reactiont = 3.0f;
 #ifdef DEBUG_INTERCEPT
         MonoPrint("PURE");
 #endif

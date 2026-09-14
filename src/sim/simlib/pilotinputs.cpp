@@ -1,4 +1,7 @@
 #include "stdhdr.h"
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "pilotinputs.h"
 #include "simio.h"
 #include "simmath.h"
@@ -80,6 +83,10 @@ PilotInputs::~PilotInputs(void)
 
 void PilotInputs::Update()
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("Human flight controls");
+#else
+
     AircraftClass *playerAC = SimDriver.GetPlayerAircraft();
 
     // Retro 31Dec2003
@@ -357,6 +364,8 @@ void PilotInputs::Update()
             }
         }
     }
+
+#endif
 }
 
 

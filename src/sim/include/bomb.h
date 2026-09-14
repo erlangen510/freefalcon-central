@@ -156,12 +156,15 @@ public:
     int LauGetSalvoSize(void);
     void LauGetAttitude(float &elevation, float &azimuth);
     int LauGetRoundsRemaining(void);
+    int LauGetRoundsOnboard(void) const { return lauRounds; }
+    int LauGetQueuedRounds(void) const { return lauFireCount; }
     void LauSetRoundsRemaining(int r);
     void LauAddRounds(int count);
     int LauGetMaxRounds(void);
     int LauGetWeaponId(void);
     int LauCheckTimer(void);
     void LauFireSalvo(void);
+    void LauCancelSalvo(void);
     int LauIsFiring(void);
     void LauRemFiredRound(void);
 

@@ -355,11 +355,12 @@ int GunClass::Exec(int* fire, TransformMatrix dmx, ObjectGeometry* geomData,
     // 2000-10-17 MODIFIED BY S.G. SO BULLETS STAY IN THE AIR LONGER (WE'LL USE AN UNUSED FIELD IN THE WCD FILE)
     // This var will take the first 3 bits of that field and use it for 1 to 8 seconds.
     // if ( qTimer >= SimLibMajorFrameTime * 4.0f )
-    if (qTimer >= SimLibMajorFrameTime *
-                      (float)(((((unsigned char*)wcPtr)[45] bitand 7) + 1) * 2))
+    const float tracerLifetime = float((((unsigned char*)wcPtr)[45] bitand 7) + 1);
+    const float queueInterval = tracerLifetime / max(numTracers,1);
+    if (qTimer >= queueInterval)
     {
         advanceQueue = TRUE;
-        qTimer = 0.0f;
+        qTimer -= queueInterval;
     }
 
     //START_PROFILE("GUNS EXEC");
@@ -401,9 +402,9 @@ int GunClass::Exec(int* fire, TransformMatrix dmx, ObjectGeometry* geomData,
             // Since we run a SimLibFrameTime sec frame and there should be roundPerSecond
             // a bullet comes out very we need to extend the vector by roundsPerSecond*SimLibFrameTime
             // 2000-10-11 NOT TOUCHED BY S.G. BUT MAY BE HE WAS ON LSD, THIS MAKES NO SENSE
-            vec.x *= roundsPerSecond * SimLibMajorFrameTime * 2.0F;
-            vec.y *= roundsPerSecond * SimLibMajorFrameTime * 2.0F;
-            vec.z *= roundsPerSecond * SimLibMajorFrameTime * 2.0F;
+            // Collision must cover the actual distance traveled this frame.
+            // Scaling by firing rate shortens this segment for slow guns and
+            // lets a bullet cross a target without testing that part of its path.
 
             // get ground level of furthest bullet
             if (gotGround == FALSE)
@@ -431,23 +432,10 @@ int GunClass::Exec(int* fire, TransformMatrix dmx, ObjectGeometry* geomData,
 #endif
             }
 
-            // 2nd point is where bullet starts
-            if (i == 0)
-            {
-                p2.x = parent->XPos();
-                p2.y = parent->YPos();
-                p2.z = parent->ZPos();
-
-                p2.x += dmx[0][0] * xPos + dmx[1][0] * yPos + dmx[2][0] * zPos;
-                p2.y += dmx[0][1] * xPos + dmx[1][1] * yPos + dmx[2][1] * zPos;
-                p2.z += dmx[0][2] * xPos + dmx[1][2] * yPos + dmx[2][2] * zPos;
-            }
-            else
-            {
-                p2.x = bulptr->x;
-                p2.y = bulptr->y;
-                p2.z = bulptr->z;
-            }
+            // Start and end of the actual swept projectile segment.
+            p2.x = bulptr->x;
+            p2.y = bulptr->y;
+            p2.z = bulptr->z;
 
             p3.x = (float)fabs(vec.x);
             p3.y = (float)fabs(vec.y);
@@ -654,6 +642,18 @@ int GunClass::Exec(int* fire, TransformMatrix dmx, ObjectGeometry* geomData,
 
             while (testObject)
             {
+#ifdef FF_HEADLESS
+                if(parent->IsHelicopter() && testObject->localData && testObject->BaseData() && testObject->BaseData()->IsSim()) {
+                    const auto* target=testObject->BaseData();
+                    const float dx=target->XPos()-bulptr->x,dy=target->YPos()-bulptr->y,dz=target->ZPos()-bulptr->z;
+                    static float closestHelicopterBullet=1e9f;
+                    const float separation=sqrtf(dx*dx+dy*dy+dz*dz);
+                    if(separation<closestHelicopterBullet-100.0f) {
+                        closestHelicopterBullet=separation;
+                        fprintf(stderr,"[helo-bullet] target=%lu miss=%.1f delta=%.1f,%.1f,%.1f range=%.1f drawable=%d lifetime=%.2f\n",target->Id().num_,separation,dx,dy,dz,testObject->localData->range,static_cast<SimBaseClass*>(testObject->BaseData())->drawPointer!=nullptr,tracerLifetime);
+                    }
+                }
+#endif
                 if (testObject->BaseData() and
                     testObject->BaseData()->IsSim() and
                     (not testObject->BaseData()->IsWeapon() or
@@ -680,10 +680,10 @@ int GunClass::Exec(int* fire, TransformMatrix dmx, ObjectGeometry* geomData,
                         fabs(p1.y - fpos.y) < vt + p3.y and
                         fabs(p1.z - fpos.z) < vt + p3.z)
                     {
-                        // Back up 1/2 of the vector traveled.
-                        org.x = p2.x - 0.5F * vec.x;
-                        org.y = p2.y - 0.5F * vec.y;
-                        org.z = p2.z - 0.5F * vec.z;
+                        // Test from the beginning of this frame's projectile path.
+                        org.x = p2.x;
+                        org.y = p2.y;
+                        org.z = p2.z;
 
                         // init pos to something, not really necessary
                         pos = fpos;

@@ -715,6 +715,10 @@ void RadarSuperClass::ExecAA(void)
 
 void RadarSuperClass::Display(VirtualDisplay* activeDisplay)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     // For now we have to do this silly thing to placate the SMS display routine --
     // we really should get ride of the display/privateDisplay dicotemy.
     display = activeDisplay;
@@ -742,6 +746,8 @@ void RadarSuperClass::Display(VirtualDisplay* activeDisplay)
     {
         DisplayAGReturns();
     }
+
+#endif
 }
 
 
@@ -921,6 +927,10 @@ float RadarSuperClass::CursorDelta(float x, float y)
 
 void RadarSuperClass::DrawCursor(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     char str[8];
     float ang;
     float high;
@@ -974,11 +984,17 @@ void RadarSuperClass::DrawCursor(void)
     display->TextLeft(0.06F, -0.035F, str);
 
     display->CenterOriginInViewport();
+
+#endif
 }
 
 
 void RadarSuperClass::DrawBullseyeData(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float az, range;
     float cursX, cursY;
     char str[12];
@@ -1018,11 +1034,17 @@ void RadarSuperClass::DrawBullseyeData(void)
     ShiAssert(strlen(str) < sizeof(str));
     display->TextLeft(-0.95F, -0.75F, str);
     display->TextLeft(-0.95f, -0.65f, "BULLSEYE");
+
+#endif
 }
 
 
 void RadarSuperClass::DrawLockedAirInfo(float h, float v)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float trackTriH = TRACK_SIZE * (float)cos(DTR * 30.0f);
     static const float trackTriV = TRACK_SIZE * (float)sin(DTR * 30.0f);
     float value;
@@ -1126,11 +1148,17 @@ void RadarSuperClass::DrawLockedAirInfo(float h, float v)
 
     // Undo the viewpoint origin shift
     display->CenterOriginInViewport();
+
+#endif
 }
 
 
 void RadarSuperClass::DrawLockedGndInfo(float h, float v)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float x, y; // Screen space coordinates (x left/right)
     char string[16];
 
@@ -1192,11 +1220,17 @@ void RadarSuperClass::DrawLockedGndInfo(float h, float v)
 
     // Put the viewport shift back the way we got it
     display->AdjustOriginInViewport(0.0f, -1.0f);
+
+#endif
 }
 
 
 void RadarSuperClass::DrawWaterline(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     float yPos, theta;
     mlTrig rot;
 
@@ -1225,11 +1259,17 @@ void RadarSuperClass::DrawWaterline(void)
 
     display->ZeroRotationAboutOrigin();
     display->CenterOriginInViewport();
+
+#endif
 }
 
 
 void RadarSuperClass::DrawButtons(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     static const float arrowH = 0.0375f;
     static const float arrowW = 0.0433f;
     char string[4];
@@ -1264,6 +1304,8 @@ void RadarSuperClass::DrawButtons(void)
 
     LabelButton(13, "FCR", NULL, 1);
     LabelButton(14, "SWAP", "");
+
+#endif
 }
 
 

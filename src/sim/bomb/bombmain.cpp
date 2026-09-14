@@ -193,7 +193,13 @@ void BombClass::Init()
     wc = (WeaponClassDataType*)classPtr->dataPtr;
     wpnDefinition = &SimWeaponDataTable[classPtr->vehicleDataIndex];
     dataIdx = wpnDefinition->dataIdx;
-    ReadInput(dataIdx);
+    // Legacy TYPE_ROCKET pods carry a missile dataset index, not a bomb index.
+    // Use the native default launcher timing and let LauInit read the RKT map.
+    if (classPtr->vuClassData.classInfo_[VU_TYPE] == TYPE_ROCKET and
+        wpnDefinition->weaponClass == wcRocketWpn)
+        ReadInput(0x7fffffff);
+    else
+        ReadInput(dataIdx);
 
     LauInit(); // MLR 3/5/2004 -
 

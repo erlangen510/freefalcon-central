@@ -286,7 +286,10 @@ float DigitalBrain::AutoTrack(float maxMnvrGs)
             fabs(self->Pitch()) < 45.0F * DTR)
         {
             elerr = maxMnvrGs * 0.85F;
-            droll = (float)acos(1.0F / elerr);
+            // A coordinated level turn requires at least one G. Low/zero-G
+            // waypoint commands have no bank solution; keep wings level
+            // while preserving their requested pitch/G command below.
+            droll = elerr > 1.0F ? (float)acos(1.0F / elerr) : 0.0F;
             SetMaxRoll(droll * RTD);
             droll -= self->Roll();
             SetRstick(droll * RTD);
@@ -378,6 +381,7 @@ float DigitalBrain::SetPstick(float pitchError, float gLimit, int commandType)
 
 float DigitalBrain::SetRstick(float rollError)
 {
+
     float maxRoll = af->MaxRoll();
     float stickCmd;
 

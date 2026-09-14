@@ -61,7 +61,18 @@ FalconMissileEndMessage::~FalconMissileEndMessage(void)
 int FalconMissileEndMessage::Process(uchar autodisp)
 {
 #ifdef FF_HEADLESS
-    ff_headless::unsupported("FalconMissileEndMessage::Process");
+    // EndMissile already applied native proximity damage. This event only
+    // renders sound/particles upstream; expose its actual end code to observers.
+    if (!autodisp) {
+        ++ff_headless::combat.missileEnds;
+        if(ff_headless::combat.trackProjectileEnds)
+            ++ff_headless::combat.projectileEnds[{dataBlock.fWeaponUID.creator_,dataBlock.fWeaponUID.num_}];
+        if(ff_headless::combat.trackProjectileEnds)
+            ff_headless::combat.projectileEndState[{dataBlock.fWeaponUID.creator_,dataBlock.fWeaponUID.num_}]={dataBlock.x,dataBlock.y,dataBlock.z,float(dataBlock.endCode)};
+        ff_headless::combat.lastMissileEnd = dataBlock.endCode;
+        if(dataBlock.endCode < 12) ++ff_headless::combat.missileEndCodes[dataBlock.endCode];
+    }
+    return !autodisp;
 #else
 
     // Your Code Goes Here

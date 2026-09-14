@@ -37,6 +37,9 @@ typedef enum TracerCollisionMode
 
 class GunClass : public SimWeaponClass
 {
+#ifdef FF_HEADLESS
+    friend void RunTracerLifetimeDiagnostic(GunClass* gun);
+#endif
 
 #ifdef USE_SH_POOLS
 public:
@@ -124,6 +127,12 @@ public:
     GunTracerType *bullet;
     float roundsPerSecond;
     int numRoundsRemaining;
+    float GetAmmunitionRemainder() const { return fractionalRoundsRemaining; }
+    void RestoreAmmunition(int rounds, float remainder) {
+        const int restored=rounds<0?0:(rounds>numRoundsRemaining?numRoundsRemaining:rounds);
+        numRoundsRemaining=restored;
+        fractionalRoundsRemaining=restored==rounds?remainder:0.0f;
+    }
     int numTracers;
     int numFirstTracers;
     int unlimitedAmmo;

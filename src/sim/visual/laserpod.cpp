@@ -1,4 +1,7 @@
 #include "stdhdr.h"
+#ifdef FF_HEADLESS
+#include "headless/boundary.h"
+#endif
 #include "object.h"
 #include "laserpod.h"
 #include "graphics/include/renderir.h"
@@ -70,6 +73,10 @@ SimObjectType* LaserPodClass::Exec(SimObjectType*)
 
 void LaserPodClass::DisplayInit(ImageBuffer* image)
 {
+#ifdef FF_HEADLESS
+
+#else
+
     if (not g_bGreyScaleMFD)
         g_bGreyMFD = false;
 
@@ -85,6 +92,8 @@ void LaserPodClass::DisplayInit(ImageBuffer* image)
     tgtX = platform->XPos();
     tgtY = platform->YPos();
     tgtZ = platform->ZPos();
+
+#endif
 }
 
 
@@ -111,13 +120,19 @@ void LaserPodClass::ToggleFOV(void)
             curFOV = 6.0F * DTR;
     }
 
+#ifndef FF_HEADLESS
     if (privateDisplay)
         ((Render3D*)privateDisplay)->SetFOV(curFOV);
+#endif
 }
 
 
 void LaserPodClass::Display(VirtualDisplay* newDisplay)
 {
+#ifdef FF_HEADLESS
+    ff_headless::unsupported("Laser pod display-dependent targeting");
+#else
+
     AircraftClass* playerAC = SimDriver.GetPlayerAircraft();
     display = newDisplay;
 
@@ -362,11 +377,17 @@ void LaserPodClass::Display(VirtualDisplay* newDisplay)
             }
         }
     }
+
+#endif
 }
 
 
 void LaserPodClass::DrawTerrain(void)
 {
+#ifdef FF_HEADLESS
+
+#else
+
     Trotation viewRotation;
 
     // RV - Biker - We have data for Lantirn Camera so why not use it
@@ -488,6 +509,8 @@ void LaserPodClass::DrawTerrain(void)
 
     //   ((RenderTV*)display)->PostSceneCloudOcclusion();
     ((RenderTV*)display)->EndDraw();
+
+#endif
 }
 
 

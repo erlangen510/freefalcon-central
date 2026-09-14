@@ -343,7 +343,10 @@ VU_BOOL SimAirfieldFilter::Test(VuEntity* e)
         (e->EntityType())->classInfo_[VU_CLASS] not_eq CLASS_OBJECTIVE)
         return FALSE;
 
-    if ((e->EntityType())->classInfo_[VU_TYPE] not_eq TYPE_AIRBASE)
+    // ObjectiveClass constructs an ATC brain for both airbases and airstrips.
+    // Both must participate in periodic traffic/clearance processing.
+    const int type = (e->EntityType())->classInfo_[VU_TYPE];
+    if (type not_eq TYPE_AIRBASE and type not_eq TYPE_AIRSTRIP)
         return FALSE;
 
     return TRUE;

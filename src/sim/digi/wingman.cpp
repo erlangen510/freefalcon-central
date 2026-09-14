@@ -40,6 +40,15 @@ void DigitalBrain::ReceiveOrders(FalconEvent *theEvent)
     wingMsg = (FalconWingmanMsg *)theEvent;
     command = (FalconWingmanMsg::WingManCmd)wingMsg->dataBlock.command;
 
+    // Autonomous lead orders must not release an explicit operator hold.
+    // The operator command adapter clears the veto before an explicit free.
+    if (IsOperatorWeaponsHold() and
+        (command == FalconWingmanMsg::WMWeaponsFree or
+         command == FalconWingmanMsg::WMAssignTarget or
+         command == FalconWingmanMsg::WMAssignGroup or
+         command == FalconWingmanMsg::WMShooterMode))
+        return;
+
     p_flight = (FlightClass *)vuDatabase->Find(wingMsg->EntityId());
     p_from = (AircraftClass *)vuDatabase->Find(wingMsg->dataBlock.from);
     fromIndex = p_flight->GetComponentIndex(p_from);

@@ -188,6 +188,10 @@ RadarDopplerClass::~RadarDopplerClass(void)
 
 void RadarDopplerClass::DisplayInit(ImageBuffer* newImage)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     DisplayExit();
 
     privateDisplay = new RenderGMComposite;
@@ -199,6 +203,8 @@ void RadarDopplerClass::DisplayInit(ImageBuffer* newImage)
         SetGMScan();
 
     privateDisplay->SetColor(0xff00ff00);
+
+#endif
 }
 
 void RadarDopplerClass::SetSensorTarget(SimObjectType* newTarget)
@@ -650,6 +656,10 @@ static const struct RadarMenus cmenu[20] = {
 
 void RadarDopplerClass::MENUDisplay(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
     if (IsSet(MenuMode))
     {
         for (int i = 0; i < 20; i++)
@@ -712,6 +722,8 @@ void RadarDopplerClass::MENUDisplay(void)
     }
 
     BottomRow();
+
+#endif
 }
 
 void RadarDopplerClass::MenuPushButton(int whichButton, int whichMFD)
@@ -1416,6 +1428,12 @@ void RadarDopplerClass::GetCursorPosition(float* xPos, float* yPos)
 //MI added function
 void RadarDopplerClass::DrawRCRCount(void)
 {
+#ifdef FF_HEADLESS
+// Cockpit rendering only.
+#else
+
+
+#endif
 }
 
 // MD -- 20040228: access function for GM SP ground stabilized pseudo waypoint

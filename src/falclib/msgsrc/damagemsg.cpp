@@ -1,5 +1,6 @@
 #ifdef FF_HEADLESS
 #include "headless/boundary.h"
+#include <cmath>
 #endif
 #include "msginc/damagemsg.h"
 #include "msginc/campweaponfiremsg.h"
@@ -48,7 +49,36 @@ int FalconDamageMessage::Process(uchar autodisp)
     {
         if (theEntity->IsSim())
         {
+#ifdef FF_HEADLESS
+            ++ff_headless::combat.detailedDamageMessages;
+    if(theEntity->IsAirplane()) ++ff_headless::combat.aircraftDamageMessages;
+#endif
+#ifdef FF_HEADLESS
+            const float strengthBefore = static_cast<SimBaseClass*>(theEntity)->Strength();
+#endif
             ((SimBaseClass*)theEntity)->ApplyDamage(this);
+#ifdef FF_HEADLESS
+            if (!std::isfinite(static_cast<SimBaseClass*>(theEntity)->Strength()))
+                throw std::runtime_error("Non-finite native damage: victim="+std::to_string(dataBlock.dEntityID.num_)+
+                    " shooter="+std::to_string(dataBlock.fEntityID.num_)+" weapon="+std::to_string(dataBlock.fWeaponID)+
+                    " type="+std::to_string(dataBlock.damageType)+" input="+std::to_string(dataBlock.damageStrength)+
+                    " random="+std::to_string(dataBlock.damageRandomFact)+" before="+std::to_string(strengthBefore));
+            shooter = static_cast<FalconEntity*>(vuDatabase->Find(dataBlock.fEntityID));
+            if(ff_headless::combat.trackProjectileEnds && theEntity->IsHelicopter() && static_cast<SimBaseClass*>(theEntity)->Strength()<strengthBefore)
+                fprintf(stderr,"[helo-damage-received] victim=%lu shooter=%lu projectile=%lu strength=%.2f->%.2f\n",theEntity->Id().num_,dataBlock.fEntityID.num_,dataBlock.fWeaponUID.num_,strengthBefore,static_cast<SimBaseClass*>(theEntity)->Strength());
+            if(ff_headless::combat.trackProjectileEnds && static_cast<SimBaseClass*>(theEntity)->Strength()<strengthBefore)
+            {
+                ++ff_headless::combat.projectileDamage[{dataBlock.fWeaponUID.creator_,dataBlock.fWeaponUID.num_}];
+                ++ff_headless::combat.projectileVictimDamage[{dataBlock.fWeaponUID.creator_,dataBlock.fWeaponUID.num_,dataBlock.dEntityID.creator_,dataBlock.dEntityID.num_}];
+            }
+            if (shooter && shooter->IsSim() && shooter->IsHelicopter() &&
+                static_cast<SimBaseClass*>(theEntity)->Strength() < strengthBefore)
+            {
+                ++ff_headless::combat.helicopterDamageDealt;
+                if(ff_headless::combat.trackProjectileEnds)
+                    fprintf(stderr,"[helo-damage-dealt] time=%lu shooter=%lu victim=%lu weapon=%u projectile=%lu type=%u strength=%.2f->%.2f\n",SimLibElapsedTime,dataBlock.fEntityID.num_,dataBlock.dEntityID.num_,dataBlock.fWeaponID,dataBlock.fWeaponUID.num_,dataBlock.damageType,strengthBefore,static_cast<SimBaseClass*>(theEntity)->Strength());
+            }
+#endif
 
             // Record any hits directly
             if (TheCampaign.MissionEvaluator and
@@ -124,7 +154,7 @@ FalconDamageMessage* CreateGroundCollisionMessage(SimVehicleClass* vehicle,
                                                   int damage,
                                                   VuTargetEntity* target)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("CreateGroundCollisionMessage");
 #else
 

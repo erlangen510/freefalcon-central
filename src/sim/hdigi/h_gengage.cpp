@@ -16,6 +16,11 @@
 #include "fsound.h"
 #include "soundfx.h"
 #include "unit.h"
+#include "drawbsp.h"
+#include "otwdrive.h"
+#include "helimm.h"
+#include "bomb.h"
+#include "misslist.h"
 
 #define INIT_GUN_VEL 7000.0F
 #define GUN_MAX_RANGE 8000.0F
@@ -175,6 +180,47 @@ void HeliBrain::GunsEngageCheck(void)
     }
 }
 
+void HeliBrain::UpdateRocketAim()
+{
+    BombClass* pod = NULL;
+    int podStation = -1;
+    for(int hp=0;hp<self->Sms->NumHardpoints();++hp) {
+        auto* weapon=self->Sms->hardPoint[hp]->weaponPointer.get();
+        if(weapon && weapon->IsLauncher()) {
+            auto* candidate=static_cast<BombClass*>(weapon);
+            if(candidate->LauIsFiring() || (hp==self->Sms->CurHardpoint() && candidate->LauGetRoundsRemaining()>0)) {
+                pod=candidate;podStation=hp;break;
+            }
+        }
+    }
+    if(!pod || !targetPtr) {rocketAimValid=false;return;}
+    if(SimLibElapsedTime<rocketAimNextUpdate && rocketAimTarget==targetPtr->BaseData()->Id()) return;
+    rocketAimNextUpdate=SimLibElapsedTime+200;
+    rocketAimTarget=targetPtr->BaseData()->Id();
+    VuBin<MissileClass> probe(static_cast<MissileClass*>(InitAMissile(self,pod->LauGetWeaponId(),0)));
+    auto* station=self->Sms->hardPoint[podStation];
+    const int slot=min(station->NumPoints()-1,pod->GetRackSlot());
+    float mountX,mountY,mountZ,mountAz,mountEl;
+    station->GetSubPosition(slot,&mountX,&mountY,&mountZ);
+    station->GetSubRotation(slot,&mountAz,&mountEl);
+    probe->SetLaunchPosition(mountX,mountY,mountZ);
+    probe->SetLaunchRotation(mountAz,mountEl);
+    float ix=0,iy=0,iz=0,tof=0;
+    rocketAimValid=probe->FindRocketGroundImpact(&ix,&iy,&iz,&tof)!=FALSE;
+    if(!rocketAimValid) return;
+    auto* target=targetPtr->BaseData();
+    const float tx=target->XPos()+target->XDelta()*tof;
+    const float ty=target->YPos()+target->YDelta()*tof;
+    const float tz=target->ZPos()+target->ZDelta()*tof;
+    const float targetRange=sqrt((tx-self->XPos())*(tx-self->XPos())+(ty-self->YPos())*(ty-self->YPos()));
+    const float impactRange=sqrt((ix-self->XPos())*(ix-self->XPos())+(iy-self->YPos())*(iy-self->YPos()));
+    const float targetElevation=atan2(self->ZPos()-tz,targetRange);
+    const float impactElevation=atan2(self->ZPos()-iz,impactRange);
+    rocketAimPitch=self->Pitch()+targetElevation-impactElevation;
+    rocketAimError=sqrt((ix-tx)*(ix-tx)+(iy-ty)*(iy-ty));
+    rocketAimTolerance=sqrt(probe->lethalRadiusSqrd)*0.5f;
+}
+
 void HeliBrain::GunsEngage(void)
 {
     float rng, desHeading;
@@ -203,6 +249,7 @@ void HeliBrain::GunsEngage(void)
     }
 
     WeaponSelection();
+    UpdateRocketAim();
 
     if (self->pctStrength < 1.0)
     {
@@ -229,7 +276,22 @@ void HeliBrain::GunsEngage(void)
     {
         Tpoint pos;
         theObject->drawPointer->GetPosition(&pos);
-        zft = pos.z - 20.0f - self->ZPos();
+        // Aim inside the actual collision model, including its scale and
+        // orientation. A fixed 20-foot elevation overshoots small ground units.
+        if(auto* model=dynamic_cast<DrawableBSP*>(theObject->drawPointer)) {
+            Tpoint low,high;
+            model->GetBoundingBox(&low,&high);
+            const float cx=(low.x+high.x)*0.5f*model->GetScale();
+            const float cy=(low.y+high.y)*0.5f*model->GetScale();
+            const float cz=(low.z+high.z)*0.5f*model->GetScale();
+            const auto& rotation=model->orientation;
+            pos.x+=rotation.M11*cx+rotation.M12*cy+rotation.M13*cz;
+            pos.y+=rotation.M21*cx+rotation.M22*cy+rotation.M23*cz;
+            pos.z+=rotation.M31*cx+rotation.M32*cy+rotation.M33*cz;
+        }
+        xft = pos.x - self->XPos();
+        yft = pos.y - self->YPos();
+        zft = pos.z - self->ZPos();
     }
     else
     {
@@ -286,12 +348,24 @@ void HeliBrain::GunsEngage(void)
         float az, el;
         mlTrig tha, psi;
 
+        // As with missile/rocket release, the pilot must arm the gun before
+        // requesting fire. An explicit user safety latch still wins in SMS.
+        self->Sms->SetMasterArm(SMSBaseClass::Arm);
         SetFlag(GunFireFlag);
+#ifdef FF_HEADLESS
+        static unsigned aimObservations=0;
+        auto* aimModel=dynamic_cast<DrawableBSP*>(theObject->drawPointer);
+        if(aimObservations++<8 && aimModel && self->Guns)
+            fprintf(stderr,"[helo-gun-aim] target=%lu range=%.1f muzzle=%.1f box_z=%.1f,%.1f aim_z=%.1f\n",
+                theObject->Id().num_,targetData->range,self->Guns->initBulletVelocity,
+                aimModel->instance.BoxTop(),aimModel->instance.BoxBottom(),
+                zft+self->ZPos()-theObject->ZPos());
+#endif
         // MonoPrint ("HELO Digi Firing %8ld   %4d -> %4d\n", SimLibElapsedTime,
         //    self->Id().num_, targetPtr->BaseData()->Id().num_);
 
-        // Guess TOF
-        tof = targetData->range / 3000.0f;
+        // Use the mounted gun's muzzle velocity for lead and gravity correction.
+        tof = targetData->range / (self->Guns ? max(self->Guns->initBulletVelocity,1.0f) : 3000.0f);
 
         // now get vector to where we're aiming
         xft += theObject->XDelta() * tof;
@@ -401,12 +475,13 @@ void HeliBrain::GunsEngage(void)
     // Rockets
     //TJL 11/15/03 Rockets have max range of 3 miles
     else //if ( self->FCC->GetMasterMode() == FireControlComputer::AirGroundBomb and self->FCC->GetSubMode() == FireControlComputer::RCKT ) {
-        if (self->FCC->GetMasterMode() ==
-            FireControlComputer::AirGroundRocket) // MLR 4/3/2004 -
+        if (self->FCC->GetMasterMode() == FireControlComputer::AirGroundRocket or
+            self->Sms->IsFiringRockets())
         {
-            //if ( targetData->range >= 1000.0f and targetData->range <= 10000.0F)
-            if (targetData->range >= 6000.0f and targetData->range <= 15000.0F)
-                desSpeed = 0.0f;
+            // Fixed pods follow body pitch. MachHold maps this normalized
+            // command to the native helicopter pitch controller.
+            if (targetData->range <= maxWpnRange or self->Sms->IsFiringRockets())
+                desSpeed = min(1.0f, max(-1.0f, (rocketAimValid ? -rocketAimPitch : elerr) / MAX_HELI_PITCH));
         }
 
     //sprintf( debugbuf, "heading=%.3f, rollLoad=%.3f dir=%.3f, desSpeed=%.3f, elerr=%.3f\n",  desHeading * RTD, rollLoad, rollDir, desSpeed, elerr );
@@ -414,7 +489,9 @@ void HeliBrain::GunsEngage(void)
 
     if (targetPtr->BaseData()->OnGround())
     {
-        if (desSpeed > 0.2f and rng < 6000.0f)
+        if (desSpeed > 0.2f and rng < 6000.0f and
+            self->FCC->GetMasterMode() not_eq FireControlComputer::AirGroundRocket and
+            not self->Sms->IsFiringRockets())
         {
             rollLoad = 0.0f;
         }
@@ -435,7 +512,10 @@ void HeliBrain::GunsEngage(void)
     }
 
     LevelTurn(rollLoad, rollDir, TRUE);
-    MachHold(desSpeed, min(max(300.0f, -alt), 3500.0f), TRUE);
+    // alt is world Z; MachHold accepts positive height over its look-ahead terrain.
+    const float groundZ = OTWDriver.GetGroundLevel(self->XPos() + self->XDelta(),
+                                                  self->YPos() + self->YDelta());
+    MachHold(desSpeed, min(max(300.0f, groundZ - alt), 3500.0f), TRUE);
 }
 
 void HeliBrain::CoarseGunsTrack(float, float, float *)
@@ -501,6 +581,10 @@ void HeliBrain::FireControl(void)
             FireControlComputer::AirGroundRocket) // MLR 4/3/2004 -
         {
             if (targetData->range < 1000.0f or targetData->range > maxWpnRange)
+                return;
+            // Fixed pods must put the predicted impact inside the native blast
+            // footprint; boresight alone cannot account for powered flight.
+            if (!rocketAimValid || rocketAimError > rocketAimTolerance)
                 return;
         }
         // END OF ADDED SECTION

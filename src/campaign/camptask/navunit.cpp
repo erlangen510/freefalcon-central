@@ -189,7 +189,7 @@ int TaskForceClass::GetUnitSpeed() const
 
 int TaskForceClass::GetVehicleDeagData(SimInitDataClass *simdata, int remote)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("TaskForceClass::GetVehicleDeagData");
 #else
 

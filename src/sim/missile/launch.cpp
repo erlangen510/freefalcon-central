@@ -242,7 +242,7 @@ void MissileClass::SetLaunchData(void)
 
         float disp_az, disp_el; // MLR 1/17/2004 - Added random dispersion
 
-        if (flags and FindingImpact)
+        if (flags bitand FindingImpact)
         {
             // MLR - if we are computing the Impact Point, don't randomize the azimuth bitand elevation,
             // MLR - or the HUD's impact predictor jumps around wildly

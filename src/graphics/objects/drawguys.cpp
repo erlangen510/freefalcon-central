@@ -55,6 +55,10 @@ DrawableGuys::DrawableGuys(int ID, Tpoint *pos, float heading, int numGuys,
 \***************************************************************************/
 void DrawableGuys::Draw(class RenderOTW *renderer, int LOD)
 {
+#ifdef FF_HEADLESS
+    // External observer owns rendering. Native geometry/attachment data remains live.
+#else
+
     int i;
     Tpoint savePosition;
     Tpoint *poff;
@@ -184,4 +188,6 @@ void DrawableGuys::Draw(class RenderOTW *renderer, int LOD)
     // restore position
     position = savePosition;
     drawLabels = saveLabels;
+
+#endif
 }

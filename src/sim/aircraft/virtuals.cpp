@@ -1,3 +1,6 @@
+#ifdef FF_HEADLESS
+#include "boundary.h"
+#endif
 #include "stdhdr.h"
 #include "simobj.h"
 #include "drawparticlesys.h"
@@ -126,6 +129,12 @@ int AircraftClass::Wake(void)
     //if it's not a tanker this does nothing
     theBrain->InitBoom();
 
+#ifdef FF_DETAILED_ENGINE
+    // The native graphics attachment path also adds payload mass. Restore
+    // ammunition first so a recreated pod does not add its original full load.
+    extern void RestoreDetailedAircraftAmmunition(AircraftClass*);
+    RestoreDetailedAircraftAmmunition(this);
+#endif
     if (Sms)
         Sms->AddWeaponGraphics();
 
@@ -138,6 +147,10 @@ int AircraftClass::Wake(void)
     }
 
     InitCountermeasures();
+#ifdef FF_DETAILED_ENGINE
+    extern void RestoreDetailedAircraftState(AircraftClass*);
+    RestoreDetailedAircraftState(this);
+#endif
     InitDamageStation();
 
     if (this == SimDriver.GetPlayerEntity())
@@ -272,6 +285,10 @@ int AircraftClass::Sleep(void)
     {
         return retval;
     }
+#ifdef FF_DETAILED_ENGINE
+    extern void RememberDetailedAircraftState(AircraftClass*);
+    RememberDetailedAircraftState(this);
+#endif
 
     if (turbulence)
     {
@@ -351,6 +368,10 @@ int AircraftClass::Sleep(void)
 
 void AircraftClass::MakePlayerVehicle(void)
 {
+#ifdef FF_HEADLESS
+ff_headless::unsupported("Human cockpit activation");
+#else
+
     Falcon4EntityClassType* classPtr = (Falcon4EntityClassType*)EntityType();
     int i, s;
     int hasHarm, hasLGB;
@@ -716,11 +737,17 @@ void AircraftClass::MakePlayerVehicle(void)
 
     numSensors = s;
     SOIManager(SimVehicleClass::SOI_RADAR);
+
+#endif
 }
 
 
 void AircraftClass::ConfigurePlayerAvionics(void)
 {
+#ifdef FF_HEADLESS
+ff_headless::unsupported("Human cockpit activation");
+#else
+
     ShiAssert(this == SimDriver.GetPlayerEntity());
 
     // Configure the avionics appropriatly
@@ -748,6 +775,8 @@ void AircraftClass::ConfigurePlayerAvionics(void)
     // XXX JPO good place to init switches?
     if (OTWDriver.pCockpitManager)
         OTWDriver.pCockpitManager->InitialiseInstruments();
+
+#endif
 }
 
 

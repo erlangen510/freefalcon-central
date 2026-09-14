@@ -142,9 +142,15 @@ public:
     };
     void SetMasterArm(MasterArmState newState)
     {
-        masterArm = newState;
+        masterArm = operatorMasterSafe ? Safe : newState;
     };
     void StepMasterArm(void);
+    bool IsOperatorMasterSafe(void) const { return operatorMasterSafe; }
+    void SetOperatorMasterSafe(bool enabled)
+    {
+        operatorMasterSafe = enabled;
+        masterArm = enabled ? Safe : Arm;
+    }
     void StepCatIII(void);
     void ReplaceMissile(int, MissileClass *);
     void ReplaceRocket(int);
@@ -214,6 +220,7 @@ public:
     };
 
 protected:
+    bool operatorMasterSafe = false;
     int numHardpoints;
     int curHardpoint;
     int numCurrentWpn;
@@ -280,6 +287,7 @@ protected:
     void ReleaseCurWeapon(int stationUnderTest);
     //void JettisonStation (int stationNum, int rippedOff = FALSE, );
     int JettisonStation(int stationNum, JettisonMode mode);
+    bool JettisonFlightAllowed(JettisonMode mode) const;
     void SetupHardpointImage(BasicWeaponStation *hp, int count);
 
 
@@ -320,6 +328,7 @@ public:
     void SelectiveJettison(void);
     void EmergencyJettison(void);
     void JettisonWeapon(int hardpoint);
+    bool CanJettisonWeapon(int hardpoint) const;
     void RemoveWeapon(int hardpoint);
     void AGJettison(void);
     int DidEmergencyJettison(void)
@@ -384,8 +393,8 @@ public:
     WeaponType GetNextWeapon(WeaponDomain);
     WeaponType GetNextWeaponSpecific(WeaponDomain);
     void SelectWeapon(WeaponType ntype, WeaponDomain domainDesired);
-    void RemoveStore(int station, int storeId);
-    void AddStore(int station, int storeId, int visible);
+    void RemoveStore(int station, int storeId, bool containedAmmunition=false);
+    void AddStore(int station, int storeId, int visible, bool containedAmmunition=false);
     void ChooseLimiterMode(int hardpoint);
     void RipOffWeapons(float noseAngle);
     float armingdelay; //me123 status ok. armingdelay addet

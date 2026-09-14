@@ -1,5 +1,6 @@
 #ifdef FF_HEADLESS
 #include "headless/boundary.h"
+#include "classtbl.h"
 #endif
 /*
  * Machine Generated source file for message "Weapon Fire".
@@ -52,7 +53,7 @@ FalconWeaponsFire::~FalconWeaponsFire(void)
 extern bool g_bLogEvents;
 int FalconWeaponsFire::Process(uchar autodisp)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("FalconWeaponsFire::Process");
 #else
 
@@ -63,6 +64,9 @@ int FalconWeaponsFire::Process(uchar autodisp)
     if (autodisp)
         return 0;
 
+#ifdef FF_HEADLESS
+    ++ff_headless::combat.weaponsFired;
+#endif
     theTarget = (FalconEntity*)vuDatabase->Find(dataBlock.targetId);
     theEntity = (FalconEntity*)(vuDatabase->Find(dataBlock.fEntityID));
 
@@ -71,6 +75,11 @@ int FalconWeaponsFire::Process(uchar autodisp)
         if (theEntity->IsSim())
         {
             simEntity = (SimBaseClass*)theEntity;
+#ifdef FF_HEADLESS
+            if(simEntity->IsAirplane()) ++ff_headless::combat.aircraftWeaponsFired;
+            if(simEntity->IsHelicopter()) ++ff_headless::combat.helicopterWeaponsFired;
+            if(simEntity->GetDomain()==DOMAIN_SEA) ++ff_headless::combat.navalWeaponsFired;
+#endif
 
             if (simEntity and not simEntity->IsLocal() and
                 dataBlock.weaponType == GUN)

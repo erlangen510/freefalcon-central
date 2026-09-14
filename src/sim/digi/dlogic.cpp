@@ -864,6 +864,11 @@ void DigitalBrain::ResolveModeConflicts(void)
 
 void DigitalBrain::FireControl(void)
 {
+    if (IsOperatorWeaponsHold())
+    {
+        ClearFlag(BaseBrain::MslFireFlag);
+        return;
+    }
     float shootShootPct = 0.0F, pct = 0.0F;
 
     // basic check for firing, time to shoot, have a missile, have a target

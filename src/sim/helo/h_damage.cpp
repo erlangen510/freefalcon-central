@@ -183,6 +183,8 @@ void HelicopterClass::RunExplosion(void)
                                               &PSvec);
     }
 
+#ifndef FF_HEADLESS
+    // Debris below is owned by the graphical SFX system, not combat entities.
     classPtr = (Falcon4EntityClassType*)EntityType();
 
     // Add the parts (appairently hardcoded at 4)
@@ -258,6 +260,7 @@ void HelicopterClass::RunExplosion(void)
                                                   &PSvec);
         }
     }
+#endif
 }
 
 void HelicopterClass::ShowDamage(void)

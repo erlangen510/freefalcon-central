@@ -279,6 +279,7 @@ float get_air_speed(float speed, int altitude)
     return vcas;
 }
 // Native model routine from sim/simlib/simfiltr.cpp
+#ifndef FF_DETAILED_ENGINE
 int SimCompare(VuEntity* ent1, VuEntity* ent2)
 {
     int retval = 0;
@@ -323,6 +324,7 @@ float TargetEl(FalconEntity* af1, FalconEntity* af2)
     return (el);
 }
 
+#endif
 RadarDataSet* radarDatFileTable = nullptr;
 short NumRadarDatFileTable = 0;
 static const char RADAR_DIR[] = "sim/radar";
@@ -399,7 +401,7 @@ static void ReadDataArray(void* dataPtr, SimlibFileClass* inputFile,
     }
 }
 
-void ReadAllRadarData(void)
+void ReadHeadlessRadarData(void)
 {
     int i;
     SimlibFileClass* rclist;

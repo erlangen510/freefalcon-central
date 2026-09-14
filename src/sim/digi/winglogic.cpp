@@ -254,6 +254,12 @@ void DigitalBrain::AiSearchTargetList(VuEntity *pentity)
 }
 
 // 2001-06-04 ADDED BY S.G. HELP FUNCTION TO SEARCH FOR A GROUND TARGET
+static bool GroundTargetActive(SimBaseClass* target)
+{
+    return target and target->IsAwake() and not target->IsSetRemoveFlag() and
+        not target->IsExploding() and not target->IsDead() and target->pctStrength > 0.0f;
+}
+
 SimBaseClass *DigitalBrain::FindSimGroundTarget(CampBaseClass *targetGroup,
                                                 int targetNumComponents,
                                                 int startPos)
@@ -354,8 +360,7 @@ SimBaseClass *DigitalBrain::FindSimGroundTarget(CampBaseClass *targetGroup,
             continue;
 
         // Is it alive?
-        if (simTarg->IsExploding() or simTarg->IsDead() or
-            simTarg->pctStrength <= 0.0f) // Cobra - add priority filter?
+        if (not GroundTargetActive(simTarg))
             continue; // Dead thing, ignore it.
 
 
@@ -489,8 +494,18 @@ SimBaseClass *DigitalBrain::FindSimGroundTarget(CampBaseClass *targetGroup,
     // JB 011017 from Schumi if targetNumComponents is less than usComponents, then of course there is no target anymore for the wingmen to bomb, and firstSimTarg is NULL.
     if (firstSimTarg == NULL and targetNumComponents and
         targetNumComponents < usComponents)
-        firstSimTarg =
-            targetGroup->GetComponentEntity(rand() % targetNumComponents);
+    {
+        const int first = rand() % targetNumComponents;
+        for (int offset = 0; offset < targetNumComponents; ++offset)
+        {
+            auto* candidate = targetGroup->GetComponentEntity((first + offset) % targetNumComponents);
+            if (GroundTargetActive(candidate))
+            {
+                firstSimTarg = candidate;
+                break;
+            }
+        }
+    }
 
     return firstSimTarg;
 }

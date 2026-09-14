@@ -331,7 +331,7 @@ void ATCBrain::ProcessInbound(void)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::ProcessRunways(void)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::ProcessRunways");
 #else
 
@@ -459,7 +459,7 @@ void ATCBrain::ProcessRunways(void)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::ProcessQueue(int queue)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::ProcessQueue");
 #else
 
@@ -1070,7 +1070,7 @@ void ATCBrain::ProcessQueue(int queue)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::ProcessPlayers(void)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::ProcessPlayers");
 #else
 
@@ -1847,7 +1847,7 @@ void ATCBrain::RequestEmerClearance(AircraftClass *approaching)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::RequestTakeoff(AircraftClass *departing)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::RequestTakeoff");
 #else
 
@@ -2132,7 +2132,7 @@ void ATCBrain::RequestTakeoff(AircraftClass *departing)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::RequestTaxi(AircraftClass *departing)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::RequestTaxi");
 #else
 
@@ -2371,7 +2371,7 @@ void ATCBrain::RequestTaxi(AircraftClass *departing)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::AbortApproach(AircraftClass *approaching)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::AbortApproach");
 #else
 
@@ -2493,7 +2493,7 @@ void ATCBrain::SetEmergency(int queue)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::ReschedulePlanes(int queue)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::ReschedulePlanes");
 #else
 
@@ -2746,7 +2746,7 @@ void ATCBrain::CalculateMinMaxTime(AircraftClass *aircraft, int rwindex,
                                    AtcStatusEnum status, CampaignTime *min,
                                    CampaignTime *max, float cosAngle)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::CalculateMinMaxTime");
 #else
 
@@ -3710,7 +3710,7 @@ runwayQueueStruct *ATCBrain::NextToLand(int queue)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int ATCBrain::CheckVector(AircraftClass *aircraft, runwayQueueStruct *info)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::CheckVector");
 #else
 
@@ -3977,7 +3977,7 @@ int ATCBrain::CheckVector(AircraftClass *aircraft, runwayQueueStruct *info)
 void ATCBrain::FindFinalPt(AircraftClass *approaching, int rwindex, float *x,
                            float *y)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::FindFinalPt");
 #else
 
@@ -4232,7 +4232,7 @@ int ATCBrain::FindRunwayPt(FlightClass *flight, int vehicleInUnit, int rwindex,
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float ATCBrain::GetAltitude(AircraftClass *aircraft, AtcStatusEnum status)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::GetAltitude");
 #else
 
@@ -4693,7 +4693,7 @@ void ATCBrain::RemoveInbound(runwayQueueStruct *info)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::GiveOrderToWingman(AircraftClass *us, AtcStatusEnum status)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::GiveOrderToWingman");
 #else
 
@@ -5079,7 +5079,7 @@ int ATCBrain::GetRunwayName(int rwindex)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::MakeVectorCall(AircraftClass *aircraft, VuTargetEntity *target)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::MakeVectorCall");
 #else
 
@@ -5416,7 +5416,7 @@ int ATCBrain::GetTakeoffNumber(runwayQueueStruct *takeoffInfo)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int ATCBrain::GetOppositeRunway(int rwindex)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::GetOppositeRunway");
 #else
 
@@ -5442,7 +5442,7 @@ int ATCBrain::GetOppositeRunway(int rwindex)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 SimBaseClass *CheckPointGlobal(AircraftClass *self, float x, float y)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("3D taxi point lookup");
 #else
 
@@ -5501,7 +5501,7 @@ SimBaseClass *CheckPointGlobal(AircraftClass *self, float x, float y)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 SimBaseClass *CheckPointGlobal(CampBaseClass *unit, float x, float y)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("3D taxi point lookup");
 #else
 
@@ -5577,7 +5577,7 @@ SimBaseClass *CheckPointGlobal(CampBaseClass *unit, float x, float y)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 SimBaseClass *CheckTaxiPointGlobal(AircraftClass *self, float x, float y)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("CheckTaxiPointGlobal");
 #else
 
@@ -5686,7 +5686,7 @@ int ATCBrain::NumOperableRunways(void)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int ATCBrain::CheckLanding(AircraftClass *aircraft, runwayQueueStruct *landInfo)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::CheckLanding");
 #else
 
@@ -5745,7 +5745,7 @@ int ATCBrain::CheckLanding(AircraftClass *aircraft, runwayQueueStruct *landInfo)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int ATCBrain::CheckTakeoff(AircraftClass *aircraft, runwayQueueStruct *info)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::CheckTakeoff");
 #else
 
@@ -5811,7 +5811,7 @@ int ATCBrain::CheckTakeoff(AircraftClass *aircraft, runwayQueueStruct *info)
 void ATCBrain::CheckFinalApproach(AircraftClass *aircraft,
                                   runwayQueueStruct *info)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::CheckFinalApproach");
 #else
 
@@ -6016,7 +6016,7 @@ void ATCBrain::FindAbortPt(AircraftClass *aircraft, float *x, float *y,
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::RemoveFromAllOtherATCs(AircraftClass *aircraft)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("RemoveFromAllOtherATCs");
 #else
 
@@ -6054,7 +6054,7 @@ void ATCBrain::RemoveFromAllOtherATCs(AircraftClass *aircraft)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ATCBrain::RemoveFromAllATCs(AircraftClass *aircraft)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("RemoveFromAllATCs");
 #else
 
@@ -6231,7 +6231,7 @@ ulong ATCBrain::RemovePlaceHolders(VU_ID id)
 void ATCBrain::CheckForTraffic(AircraftClass *aircraft,
                                runwayQueueStruct *playerInfo)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("ATCBrain::CheckForTraffic");
 #else
 

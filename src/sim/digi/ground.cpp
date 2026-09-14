@@ -112,7 +112,11 @@ void DigitalBrain::GroundCheck(void)
     // At what angle are we headed to the ground.  Take that into account so we can try to project a recovery path.
     float pitchturnfactor = max(0.0f, sin(-self->Pitch()) * turnRadius);
     // If we need to guess at a recovery path, adjust for different delta leg sizes.
-    float directionalfactor = fabs(self->XDelta() / self->YDelta());
+    // A newly woken aircraft can have zero horizontal velocity; cardinal
+    // headings can also make either component zero. Both this ratio and its
+    // reciprocal are used below, so bound both operands away from zero.
+    float directionalfactor = max(fabs(self->XDelta()), 0.001F) /
+                              max(fabs(self->YDelta()), 0.001F);
     float xsign = (self->XDelta() > 0.0) ? 1.0f : -1.0f;
     float ysign = (self->YDelta() > 0.0) ? 1.0f : -1.0f;
     PullupNow = 0;

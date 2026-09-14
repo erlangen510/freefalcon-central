@@ -371,7 +371,11 @@ void DrawableBSP::SetLabel(char *labelString, DWORD color)
     strncpy(label, labelString, 31);
     label[31] = 0;
     labelColor = color;
+#ifdef FF_HEADLESS
+    labelLen = 0;
+#else
     labelLen = VirtualDisplay::ScreenTextWidth(labelString) >> 1;
+#endif
 }
 
 
@@ -551,6 +555,10 @@ BOOL DrawableBSP::GetRayHit(const Tpoint *from, const Tpoint *vector,
 // it returns false is the BSP results not visible for any reason
 bool DrawableBSP::SetupVisibility(RenderOTW *renderer)
 {
+#ifdef FF_HEADLESS
+    return false; // No renderer is active.
+#else
+
     float alpha, fog, z;
 
     // RED - Linear Fog - checvk if under visibility limit
@@ -613,6 +621,8 @@ bool DrawableBSP::SetupVisibility(RenderOTW *renderer)
 
     // OBJECT TO DRAW
     return true;
+
+#endif
 }
 
 /***************************************************************************\
@@ -621,6 +631,10 @@ bool DrawableBSP::SetupVisibility(RenderOTW *renderer)
 //void DrawableBSP::Draw( RenderOTW *renderer, int LOD )
 void DrawableBSP::Draw(RenderOTW *renderer, int)
 {
+#ifdef FF_HEADLESS
+    // External observer owns rendering. Native geometry/attachment data remains live.
+#else
+
     ThreeDVertex labelPoint;
     float x, y;
 
@@ -838,6 +852,8 @@ void DrawableBSP::Draw(RenderOTW *renderer, int)
     // TESTING CODE TO SHOW BOUNDING BOXES
     // DrawBoundingBox( renderer );
 #endif
+
+#endif
 }
 
 
@@ -846,6 +862,10 @@ void DrawableBSP::Draw(RenderOTW *renderer, int)
 \***************************************************************************/
 void DrawableBSP::Draw(Render3D *renderer)
 {
+#ifdef FF_HEADLESS
+    // External observer owns rendering. Native geometry/attachment data remains live.
+#else
+
     ThreeDVertex labelPoint;
     float x, y;
 
@@ -894,6 +914,8 @@ void DrawableBSP::Draw(Render3D *renderer)
     }
 
 #endif
+
+#endif
 }
 
 
@@ -902,6 +924,10 @@ void DrawableBSP::Draw(Render3D *renderer)
 \***************************************************************************/
 void DrawableBSP::DrawBoundingBox(Render3D *renderer)
 {
+#ifdef FF_HEADLESS
+    // External observer owns rendering. Native geometry/attachment data remains live.
+#else
+
     Tpoint max, min;
     Tpoint p, p1, p2;
     Trotation M;
@@ -1138,6 +1164,8 @@ void DrawableBSP::DrawBoundingBox(Render3D *renderer)
     p2.z += position.z;
 
     renderer->Render3DLine(&p1, &p2);
+
+#endif
 }
 
 
@@ -1174,6 +1202,10 @@ void DrawableBSP::ReleaseTexturesOnDevice(DXContext *rc)
 //void DrawableBSP::TimeUpdateCallback( void *self )
 void DrawableBSP::TimeUpdateCallback(void *)
 {
+#ifdef FF_HEADLESS
+    // No texture lighting in the headless process.
+#else
+
     Tcolor light;
 
     // Get the light level from the time of day manager
@@ -1186,6 +1218,8 @@ void DrawableBSP::TimeUpdateCallback(void *)
      // Update all the textures which aren't dynamicly lit
      ThePaletteBank.LightReflectionPalette( 2, &light );
      ThePaletteBank.LightBuildingPalette( 3, &light );*/
+
+#endif
 }
 
 /***************************************************************************\

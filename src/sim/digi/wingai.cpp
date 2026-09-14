@@ -1058,6 +1058,7 @@ void DigitalBrain::AiInitChainsaw(FalconWingmanMsg* msg)
 
 void DigitalBrain::AiGoShooter(void)
 {
+    if (IsOperatorWeaponsHold()) return;
     if (mpActionFlags[AI_ENGAGE_TARGET] ==
         AI_NONE) // 2002-03-04 ADDED BY S.G. Change it if not already set, assume an air target (can't tell)
         mpActionFlags[AI_ENGAGE_TARGET] =
@@ -1556,7 +1557,8 @@ void DigitalBrain::AiSetWeaponsAction(FalconWingmanMsg* msg,
         SelectGroundTarget (TARGET_ANYTHING);
         if (groundTargetPtr == NULL)
          groundTargetPtr = tmpGroundTargetPtr;*/
-        groundTargetPtr = NULL; //Ok, let's force a reevaluation each command.
+        // Reevaluate each command, releasing the brain's owned target reference.
+        SetGroundTarget(NULL);
 
         if (groundTargetPtr == NULL) //cobra
             SelectGroundTarget(TARGET_ANYTHING);
@@ -2748,18 +2750,23 @@ void DigitalBrain::AiSetRadarStby(FalconWingmanMsg* msg)
 // ----------------------------------------------------
 // DigitalBrain::AiRTB
 // ----------------------------------------------------
+bool DigitalBrain::SetReturnToBaseWaypoint(WayPointClass* waypoint)
+{
+    if(!waypoint) return false;
+    mpActionFlags[AI_ENGAGE_TARGET]=AI_NONE;
+    mpActionFlags[AI_EXECUTE_MANEUVER]=FALSE;
+    mpActionFlags[AI_FOLLOW_FORMATION]=FALSE;
+    mpActionFlags[AI_RTB]=TRUE;
+    self->curWaypoint=waypoint;
+    return true;
+}
+
 void DigitalBrain::AiRTB(FalconWingmanMsg* msg)
 {
     int flightIdx;
     short edata[10];
     WayPointClass* pWaypoint = self->waypoint;
     BOOL done = FALSE;
-
-    mpActionFlags[AI_ENGAGE_TARGET] =
-        AI_NONE; // 2002-03-04 MODIFIED BY S.G. Use new enum type
-    mpActionFlags[AI_EXECUTE_MANEUVER] = FALSE;
-    mpActionFlags[AI_FOLLOW_FORMATION] = FALSE;
-    mpActionFlags[AI_RTB] = TRUE;
 
     while (not done)
     {
@@ -2768,7 +2775,7 @@ void DigitalBrain::AiRTB(FalconWingmanMsg* msg)
             if (pWaypoint->GetWPAction() == WP_LAND)
             {
                 // RV - Biker - When RTB go to WP before home base
-                self->curWaypoint = pWaypoint->GetPrevWP();
+                if(!SetReturnToBaseWaypoint(pWaypoint->GetPrevWP())) return;
                 done = TRUE;
             }
             else
@@ -2778,8 +2785,8 @@ void DigitalBrain::AiRTB(FalconWingmanMsg* msg)
         }
         else
         {
-            // unable
-            done = TRUE;
+            // Do not latch RTB without a valid return route.
+            return;
         }
     }
 

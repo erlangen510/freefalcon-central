@@ -271,6 +271,20 @@ public:
     {
         return curMode;
     }
+    float GetMaxAAWeaponRange() const { return maxAAWpnRange; }
+    int GetWeaponsAction() const { return int(mWeaponsAction); }
+    bool IsReturningToBase() const { return mpActionFlags[AI_RTB]!=0; }
+    bool SetReturnToBaseWaypoint(WayPointClass* waypoint);
+    // Explicit observer/operator veto, independent of autonomous flight orders.
+    bool IsOperatorWeaponsHold() const { return operatorWeaponsHold; }
+    void SetOperatorWeaponsHold(bool hold) { operatorWeaponsHold = hold; }
+    VU_TIME GetMissileShotTime() const { return missileShotTimer; }
+    BVRInterceptType GetBvrTactic() const { return bvrCurrTactic; }
+    bool IsRadarSpiked() const { return spiked; }
+
+private:
+    bool operatorWeaponsHold = false;
+public:
 
     enum RefuelStatus
     {
@@ -391,6 +405,9 @@ protected:
     int HeadingAndAltitudeHold(float desHeading, float desAlt);
     float CollisionTime(void);
     void GoToCurrentWaypoint(void);
+    float ResolveWaypointAltitude(WayPointClass* waypoint, float altitude);
+    WayPointClass* altitudeHoldWaypoint = nullptr;
+    float waypointHeldAltitude = 0.0F;
     void SelectNextWaypoint(void);
     void SetWaypointSpecificStuff(void);
     int GetWaypointIndex(void);
@@ -741,6 +758,12 @@ protected:
 
 public:
     DigitalBrain(AircraftClass* myPlatform, AirframeClass* myAf);
+#ifdef FF_HEADLESS
+    friend unsigned RunBvrPursuitDiagnostic(AircraftClass*, AircraftClass*);
+    friend void RunBvrAggregateDiagnostic(AircraftClass*);
+    friend bool RunWeaponsFireGateDiagnostic(AircraftClass*);
+    friend void RunGroundRetargetDiagnostic(AircraftClass*);
+#endif
     virtual ~DigitalBrain(void);
     virtual void Sleep(void);
     void ClearCurrentMissile(void)

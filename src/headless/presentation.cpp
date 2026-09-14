@@ -19,7 +19,9 @@ ff_headless::CombatCounters ff_headless::combat;
 RealWeather* realWeather = nullptr;
 
 class NavigationSystem;
+#ifndef FF_DETAILED_ENGINE
 NavigationSystem* gNavigationSys = nullptr;
+#endif
 UIComms* gCommsMgr = nullptr;
 class C_Handler;
 C_Handler* gMainHandler = nullptr;
@@ -29,9 +31,13 @@ int NumHats = 0;
 bool g_bUseD3D12 = false, g_bVulkanProfile = false, g_bVulkanValidation = false;
 bool g_bVulkanSyncValidation = false, g_bVulkanTerrain = false, g_bUseGpu = false;
 bool g_bSleepAll = false;
+#ifndef FF_DETAILED_ENGINE
 int SimLibErrno = 0;
+#endif
 
+#ifndef FF_DETAILED_ENGINE
 float SimLibMajorFrameTime = 0;
+#endif
 UI_IA InstantActionSettings = {};
 VU_ID gCurrentFlightID;
 int DestroyObjective = 0, RepairObjective = 0;
@@ -39,7 +45,10 @@ RadarDataType* RadarDataTable = nullptr;
 struct IRSTDataType; IRSTDataType* IRSTDataTable = nullptr;
 struct RwrDataType; RwrDataType* RwrDataTable = nullptr;
 struct VisualDataType; VisualDataType* VisualDataTable = nullptr;
-short NumRadarEntries = 0, NumIRSTEntries = 0, NumRwrEntries = 0, NumVisualEntries = 0;
+short NumRadarEntries = 0, NumIRSTEntries = 0, NumVisualEntries = 0;
+#ifndef FF_DETAILED_ENGINE
+short NumRwrEntries = 0;
+#endif
 // Only used by dogfight callsign allocation (unsupported in this host).
 unsigned char calltable[5][5] = {};
 extern const char* FREE_FALCON_VERSION = "FreeFalcon headless";

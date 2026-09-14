@@ -90,6 +90,13 @@ inline int PRANDInt6(void)
 // COBRA - RED - The Real Superfast Random Function is this one
 inline long GenerateFastRandom(void)
 {
+#ifdef FF_HEADLESS
+    // A CPU timestamp bypasses the runner's seed and makes identical detailed
+    // scenarios irreproducible. Keep the original consumers/ranges, but use a
+    // separate seeded stream supplied by the headless host.
+    extern long HeadlessFastRandom();
+    return HeadlessFastRandom();
+#else
 #undef xor
     static long LastRandom;
     long FastRandom; // The Random Variable
@@ -120,6 +127,7 @@ inline long GenerateFastRandom(void)
     return (FastRandom);
 #endif
 #define xor ^
+#endif
 }
 
 

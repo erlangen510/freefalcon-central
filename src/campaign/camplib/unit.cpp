@@ -1308,7 +1308,7 @@ void UnitClass::SendDeaggregateData(VuTargetEntity* target)
 
 int UnitClass::RecordCurrentState(FalconSessionEntity* session, int byReag)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("UnitClass::RecordCurrentState");
 #else
 
@@ -1494,7 +1494,17 @@ int UnitClass::RecordCurrentState(FalconSessionEntity* session, int byReag)
                                     loadData[pilotSlot]->WeaponID[hp] =
                                         (short)SMS->hardPoint[hp]->weaponId;
 
-                                    if (WeaponDataTable[loadData[pilotSlot]
+                                    if (auto* gun=SMS->hardPoint[hp]->GetGun())
+                                    {
+                                        // GunClass::Init expands tracer loadout counts
+                                        // into ten-round groups. Preserve a partial
+                                        // final group; zero rounds must stay zero.
+                                        const int group=gun->IsTracer()?10:1;
+                                        const int rounds=max(0,gun->numRoundsRemaining);
+                                        loadData[pilotSlot]->WeaponCount[hp]=
+                                            (uchar)min(255,(rounds+group-1)/group);
+                                    }
+                                    else if (WeaponDataTable[loadData[pilotSlot]
                                                             ->WeaponID[hp]]
                                             .Flags bitand
                                         WEAP_ONETENTH)
@@ -1508,6 +1518,15 @@ int UnitClass::RecordCurrentState(FalconSessionEntity* session, int byReag)
                                             (uchar)SMS->hardPoint[hp]
                                                 ->weaponCount;
                                 }
+
+                                // A launcher stays mounted after its final round.
+                                // SMS weaponCount tracks selectable loaded pods;
+                                // campaign loadouts must retain actual containers.
+                                int mountedPods=0;
+                                for(auto* weapon=SMS->hardPoint[hp]->weaponPointer.get();weapon;weapon=weapon->GetNextOnRail())
+                                    if(weapon->IsLauncher()) ++mountedPods;
+                                if(mountedPods)
+                                    loadData[pilotSlot]->WeaponCount[hp]=(uchar)min(255,mountedPods);
 
                                 // check for ECM pod
                                 if (WeaponDataTable[SMS->hardPoint[hp]
@@ -1620,7 +1639,7 @@ int UnitClass::RecordCurrentState(FalconSessionEntity* session, int byReag)
 
 int UnitClass::Deaggregate(FalconSessionEntity* session)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("UnitClass::Deaggregate");
 #else
 
@@ -1760,6 +1779,11 @@ int UnitClass::Deaggregate(FalconSessionEntity* session)
     {
         vehs = GetNumVehicles(v);
         classID = GetVehicleID(v);
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+        // Flight roster slots identify aircraft/pilots, not distinct vehicle
+        // classes. FF6 stores their shared aircraft type in class slot zero.
+        if (IsFlight()) classID = GetVehicleID(0);
+#endif
         inslot = 0;
 
         while (vehs and classID)
@@ -1865,7 +1889,7 @@ int UnitClass::Deaggregate(FalconSessionEntity* session)
 
 int UnitClass::Reaggregate(FalconSessionEntity* session)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("UnitClass::Reaggregate");
 #else
 
@@ -1997,7 +2021,7 @@ int UnitClass::TransferOwnership(FalconSessionEntity* session)
 
 int UnitClass::Wake(void)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     ff_headless::unsupported("UnitClass::Wake");
 #else
 
@@ -2027,7 +2051,7 @@ int UnitClass::Wake(void)
 
 int UnitClass::Sleep(void)
 {
-#ifdef FF_HEADLESS
+#if defined(FF_HEADLESS) && !defined(FF_DETAILED_ENGINE)
     SetAwake(0); return 1;
 #else
 

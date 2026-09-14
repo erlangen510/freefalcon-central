@@ -685,8 +685,15 @@ void GNDAIClass::ProcessTargeting(void)
     {
         if (self->isAirCapable)
         {
-            // Arbitrarily use a 2:1 distribution for vehicles which can do both
-            if ((rand() % 3) > 1)
+            // Choose between domains only when both have an actual target.
+            // Selecting an empty air domain discarded a valid surface target
+            // and repeatedly reset the ship's radar acquisition cycle.
+            if (not battalionCommand->airTargetPtr)
+                newTarget = battalionCommand->gndTargetPtr;
+            else if (not battalionCommand->gndTargetPtr)
+                newTarget = battalionCommand->airTargetPtr;
+            // Retain the original 2:1 air preference when both are available.
+            else if ((rand() % 3) > 1)
                 newTarget = battalionCommand->gndTargetPtr;
             else
                 newTarget = battalionCommand->airTargetPtr;
@@ -746,11 +753,16 @@ void GNDAIClass::ProcessTargeting(void)
 
     if (self->targetPtr)
     {
-        if (self->isEmitter and not self->targetPtr->BaseData()->OnGround())
+        const bool navalTarget=self->isShip and self->targetPtr->BaseData()->GetDomain()==DOMAIN_SEA;
+        if (self->isEmitter and (not self->targetPtr->BaseData()->OnGround() or navalTarget))
         {
             RadarClass *radar =
                 (RadarClass *)FindSensor(self, SensorClass::Radar);
             ShiAssert(radar);
+            // Ships share this AI with land-based air defense. Surface targets
+            // need the original sea radar mode and the same acquisition cycle;
+            // otherwise radar-guided naval weapons stay permanently inhibited.
+            if(self->isShip) radar->SetMode(navalTarget ? RadarClass::SEA : RadarClass::AA);
             bool tracking = FALSE;
             bool detecting = FALSE;
             float range = 0.0f;
@@ -996,8 +1008,13 @@ void GNDAIClass::Process(void)
             break;
         }
 
-    if ((moveState == GNDAI_MOVE_WAYPOINT) and (ideal_x == self->XPos()) and
-        (ideal_y == self->YPos()))
+    // Move_Towards_Dest stops within ten feet. Order_Battalion refreshes the
+    // exact destination before this check, so equality can strand a ship just
+    // short of its waypoint forever. Use the same arrival radius as movement.
+    const float waypointDx = ideal_x - self->XPos();
+    const float waypointDy = ideal_y - self->YPos();
+    if ((moveState == GNDAI_MOVE_WAYPOINT) and
+        (waypointDx * waypointDx + waypointDy * waypointDy < 100.0F))
     {
         // if in waypoint mode choose another
         if (self->curWaypoint)

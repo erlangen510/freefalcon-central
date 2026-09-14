@@ -48,12 +48,18 @@ RwrClass::~RwrClass(void)
 
 void RwrClass::DisplayInit(ImageBuffer* image)
 {
+#ifdef FF_HEADLESS
+    // Cockpit presentation is supplied by the external observer.
+#else
+
     DisplayExit();
 
     privateDisplay = new Render2D;
     ((Render2D*)privateDisplay)->Setup(image);
 
     privateDisplay->SetColor(0xff00ff00);
+
+#endif
 }
 
 void RwrClass::GetAGCenter(float* x, float* y)
@@ -77,6 +83,10 @@ void RwrClass::DrawEmitterSymbol(int symbolID, int boxed)
 
 void RwrClass::DrawSymbol(VirtualDisplay* display, int symbolID, int boxed)
 {
+#ifdef FF_HEADLESS
+    // Cockpit presentation is supplied by the external observer.
+#else
+
     static int flash = false;
     // Do we draw flashing things this frame?
     flash = vuxRealTime bitand 0x200;
@@ -490,6 +500,8 @@ void RwrClass::DrawSymbol(VirtualDisplay* display, int symbolID, int boxed)
 
         break;
     }
+
+#endif
 }
 
 //MI

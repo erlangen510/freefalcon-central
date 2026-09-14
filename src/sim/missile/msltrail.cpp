@@ -18,7 +18,7 @@ extern int g_nmissiletrial;
 extern bool g_bDisableMissleEngGlow; // MLR 2003-10-11
 void MissileClass::InitTrail(void)
 {
-#ifndef MISSILE_TEST_PROG
+#if !defined(MISSILE_TEST_PROG) && !defined(FF_HEADLESS)
     Tpoint newPoint;
     Tpoint origPoint;
     Tpoint delta;
@@ -166,7 +166,7 @@ void MissileClass::InitTrail(void)
 
 void MissileClass::UpdateTrail(void)
 {
-#ifndef MISSILE_TEST_PROG
+#if !defined(MISSILE_TEST_PROG) && !defined(FF_HEADLESS)
     Tpoint newPoint;
     Trotation rot = IMatrix;
     float radius;
@@ -342,7 +342,7 @@ void MissileClass::UpdateTrail(void)
 
 void MissileClass::RemoveTrail(void)
 {
-#ifndef MISSILE_TEST_PROG
+#if !defined(MISSILE_TEST_PROG) && !defined(FF_HEADLESS)
 
     //   if (trail)
     if (TrailId)
