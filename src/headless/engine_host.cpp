@@ -34,6 +34,7 @@
 #include "objective_rebuild.h"
 #include "objective_layout.h"
 #include "battle_service.h"
+#include "scenario_reduce.h"
 #include "objectiv.h"
 #include <random>
 
@@ -134,6 +135,72 @@ void SaveAggregateCheckpoint(const std::filesystem::path& directory) {
     strcpy(FalconCampUserSaveDirectory,oldDirectory.c_str());strcpy(TheCampaign.Scenario,oldScenario.c_str());strcpy(TheCampaign.SaveFile,oldSave.c_str());
 }
 
+// A reduced scenario (reduce-scenario): <name>.cam saved under its own scenario name, plus the
+// source scenario's trigger script as <name>.tri and its site layouts as <name>.lay, so the
+// directory's files can be copied into a data root's campaign/SAVE and run as a new scenario.
+// Trigger script of a reduced scenario. none: the init section only. team: also every top-level
+// trigger block that names no objectives and compares no force ratios (#IF_CONTROLLED,
+// #IF_CONTR_ALLIES, #IF_PRI_CONTROLLED_LT, #IF_FORCE_RATIO, #SET_PAK_PRIORITY refer to the whole
+// theater), so the native end-game triggers (boredom, campaign day) stay. theater: unchanged.
+static void WriteReducedTriggers(const std::filesystem::path& from, const std::filesystem::path& to, const std::string& mode) {
+    if(mode=="theater") { std::filesystem::copy_file(from,to); return; }
+    std::ifstream in(from, std::ios::binary);
+    std::ofstream out(to, std::ios::binary);
+    out<<"// Reduced scenario (ff-campaign reduce-scenario, triggers "<<mode<<"): theater triggers that name objectives or force ratios are left out.\r\n";
+    std::string line;
+    bool body=false;
+    int depth=0;
+    std::vector<std::string> block;
+    bool unsafe=false;
+    auto token=[](const std::string& l) { return l.substr(0,l.find_first_of(" \t\r")); };
+    while(std::getline(in,line)) {
+        if(!body) {
+            out<<line<<'\n';
+            body=line.rfind("#ENDINIT",0)==0;
+            continue;
+        }
+        if(mode=="none") break;
+        const std::string t=token(line);
+        if(t=="#ENDSCRIPT" && !depth) break;
+        if(t.rfind("#IF",0)==0) ++depth;
+        if(depth) {
+            block.push_back(line);
+            for(const char* u:{"#IF_CONTROLLED","#IF_CONTR_ALLIES","#IF_PRI_CONTROLLED_LT","#IF_FORCE_RATIO","#SET_PAK_PRIORITY"})
+                if(t==u) unsafe=true;
+        } else if(!t.empty() && t[0]=='#') {
+            out<<line<<'\n';   // a top-level action outside any block
+        }
+        if(t=="#ENDIF" && depth && !--depth) {
+            if(!unsafe) for(const auto& l:block) out<<l<<'\n';
+            block.clear();
+            unsafe=false;
+        }
+    }
+    out<<"#ENDSCRIPT\r\n";
+    if(!out) throw std::runtime_error("Cannot write the reduced trigger script");
+}
+
+static void SaveReducedScenario(const std::filesystem::path& directory, const std::string& name, const std::filesystem::path& saveDirectory, const std::string& triggerMode) {
+    if(std::filesystem::exists(directory)) throw std::runtime_error("Output directory already exists");
+    std::filesystem::create_directories(directory);
+    const std::string oldDirectory=FalconCampUserSaveDirectory,oldScenario=TheCampaign.Scenario,oldSave=TheCampaign.SaveFile;
+    const auto triggers=saveDirectory/(oldScenario+".tri");
+    try {
+        setPath(FalconCampUserSaveDirectory,directory);
+        char file[64];strcpy(file,name.c_str());
+        if(!TheCampaign.SaveCampaign(game_Campaign,file,1)) throw std::runtime_error("Native campaign save failed");
+        const auto saved=ff::headless::InspectScenario(directory/(name+".cam"));
+        if(saved.time_ms!=TheCampaign.CurrentTime) throw std::runtime_error("Saved campaign time mismatch");
+        if(std::filesystem::exists(triggers)) WriteReducedTriggers(triggers,directory/(name+".tri"),triggerMode);
+        if(ObjectiveLayoutCount()) SaveObjectiveLayouts(directory/(name+".lay"));
+    } catch(...) {
+        EndWriteCampFile();
+        strcpy(FalconCampUserSaveDirectory,oldDirectory.c_str());strcpy(TheCampaign.Scenario,oldScenario.c_str());strcpy(TheCampaign.SaveFile,oldSave.c_str());
+        throw;
+    }
+    strcpy(FalconCampUserSaveDirectory,oldDirectory.c_str());strcpy(TheCampaign.Scenario,oldScenario.c_str());strcpy(TheCampaign.SaveFile,oldSave.c_str());
+}
+
 static void requireFile(const std::filesystem::path& file) {
     if (!std::filesystem::is_regular_file(file) || !std::filesystem::file_size(file))
         throw std::runtime_error("Missing required data file: " + file.u8string());
@@ -209,6 +276,10 @@ public:
                <<ff::headless::JsonString(name)<<",\"objective_type\":"<<int(o->GetType())<<",\"x\":"<<x<<",\"y\":"<<y
                <<",\"from_country\":"<<from<<",\"to_country\":"<<to<<",\"from_team\":"<<int(GetTeam(from))<<",\"to_team\":"<<int(GetTeam(to))
                <<",\"start_team\":"<<d<<"}\n";
+        }
+        if(TheCampaign.EndgameResult && !endgame) {
+            endgame=TheCampaign.EndgameResult;
+            out<<"{\"type\":\"campaign_over\","<<clock(TheCampaign.CurrentTime)<<",\"code\":"<<endgame<<"}\n";out.flush();
         }
         bool complete=false;
         for(int a=0;a<NUM_TEAMS;++a) for(int d=0;d<NUM_TEAMS;++d) {
@@ -289,13 +360,18 @@ private:
     CampaignTime start;
     std::map<VU_ID,int> startTeam;
     std::map<VU_ID,Control> startCountry,lastOwner;
-    int startCount[NUM_TEAMS]={},held[NUM_TEAMS][NUM_TEAMS]={},captures=0;
+    int startCount[NUM_TEAMS]={},held[NUM_TEAMS][NUM_TEAMS]={},captures=0,endgame=0;
     bool milestone[2][NUM_TEAMS][NUM_TEAMS]={};
 };
 
 void WriteCoreExport(const std::filesystem::path& directory);
 
-int RunLegacyCampaign(const std::vector<std::string>& args) {
+int RunLegacyCampaign(const std::vector<std::string>& commandLine) {
+    // conquest ... [seed] end-game: a trailing "end-game" also stops the run at FF's own campaign
+    // end (#END_GAME in the trigger script), not only at the conquest rule.
+    std::vector<std::string> args = commandLine;
+    const bool stopAtEndGame = args.size() > 6 && args[1] == "conquest" && args.back() == "end-game";
+    if (stopAtEndGame) args.pop_back();
     // CampaignThread and SimLoop normally configure this per-thread. The
     // headless host replaces both loops and must preserve their numeric mode.
     _controlfp(_RC_CHOP, MCW_RC);
@@ -327,9 +403,12 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         const bool checkpoint=args[1]=="checkpoint" || checkpointAfter || damageCheckpoint, resume=args[1]=="resume" || args[1]=="watch-resume" || args[1]=="export-checkpoint" || battle;
         // remap-theater <data-root> <scenario> <remap.txt> <new-output-directory>
         // rebuild-objectives <data-root> <scenario> <objectives.txt> <new-output-directory>
-        const bool rebuild=args[1]=="rebuild-objectives";
-        const bool remap=args[1]=="remap-theater" || rebuild;
+        // reduce-scenario <data-root> <scenario> <plan.txt> <new-output-directory>
+        const bool rebuild=args[1]=="rebuild-objectives", reduce=args[1]=="reduce-scenario";
+        const bool remap=args[1]=="remap-theater" || rebuild || reduce;
         if(remap && args.size()!=6) throw std::runtime_error("Usage: ff-campaign " + args[1] + " <data-root> <scenario-name> <plan-file> <new-output-directory>");
+        // Resolved before the host changes into the data root.
+        const auto planFile=remap?std::filesystem::absolute(std::filesystem::u8path(args[4])):std::filesystem::path();
         const auto checkpointDirectory=(checkpoint||resume)?std::filesystem::absolute(std::filesystem::u8path(args[checkpointAfter?5:checkpoint?4:3])):remap?std::filesystem::absolute(std::filesystem::u8path(args[5])):std::filesystem::path();
         if(checkpoint||resume) {
             char archivePath[MAX_PATH];
@@ -407,7 +486,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
             // Plan key -> objective id, for the viewer; moved into the checkpoint once it exists.
             auto keys = checkpointDirectory;
             keys += ".objective-keys.tmp";
-            const auto r = RebuildObjectives(std::filesystem::absolute(std::filesystem::u8path(args[4])), keys);
+            const auto r = RebuildObjectives(planFile, keys);
             SaveAggregateCheckpoint(checkpointDirectory);
             std::filesystem::rename(keys, checkpointDirectory / "objective-keys.txt");
             int objectiveTotal = 0;
@@ -421,9 +500,23 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
                       << ",\"site_layouts\":" << ObjectiveLayoutCount() << "}" << std::endl;
             std::cout.flush(); std::cerr.flush(); std::_Exit(0);
         }
+        if (reduce) {
+            // Cut the scenario down to the plan's box and save it before any planning.
+            const auto r = ReduceScenario(planFile);
+            SaveReducedScenario(checkpointDirectory, r.name, data / "campaign/SAVE", r.triggers);
+            int unitTotal = 0, objectiveTotal = 0;
+            { VuListIterator it(AllUnitList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) ++unitTotal; }
+            { VuListIterator it(AllObjList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) ++objectiveTotal; }
+            std::cout << "{\"status\":\"ok\",\"scenario\":" << ff::headless::JsonString(r.name) << ",\"box\":[" << r.x0 << ',' << r.y0 << ',' << r.x1 << ',' << r.y1
+                      << "],\"objectives_kept\":" << r.objectives_kept << ",\"objectives_dropped\":" << r.objectives_dropped << ",\"disconnected\":" << r.disconnected
+                      << ",\"units_kept\":" << r.units_kept << ",\"units_dropped\":" << r.units_dropped
+                      << ",\"triggers\":\"" << r.triggers << "\",\"links_removed\":" << r.links_removed << ",\"unit_refs\":" << r.unit_refs
+                      << ",\"active_units\":" << unitTotal << ",\"objectives\":" << objectiveTotal << "}" << std::endl;
+            std::cout.flush(); std::cerr.flush(); std::_Exit(0);
+        }
         if (remap) {
             // Relocate onto the regenerated grid and save before any planning.
-            const auto moved = RemapTheater(std::filesystem::absolute(std::filesystem::u8path(args[4])));
+            const auto moved = RemapTheater(planFile);
             SaveAggregateCheckpoint(checkpointDirectory);
             std::cout << "{\"status\":\"ok\",\"objectives\":" << moved.objectives << ",\"units\":" << moved.units
                       << ",\"parents\":" << moved.parents << ",\"missing\":" << moved.missing << ",\"links\":" << moved.links
@@ -501,6 +594,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
                 const bool complete = conquestLog->step();
                 if (second % 3600 == 0 || complete) conquestLog->status();
                 if (complete) { stopReason = "conquest"; break; }
+                if (stopAtEndGame && TheCampaign.EndgameResult) { conquestLog->status(); stopReason = "campaign_over"; break; }
             }
         }
         ff_headless::ProfileWrite((TheCampaign.CurrentTime - start) / CampaignMinutes, completedSteps);
@@ -522,6 +616,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
                   << ",\"seed\":" << seed << ",\"format_version\":" << inspected.version
                   << (conquest ? std::string(",\"stop_reason\":\"") + stopReason + "\"" : std::string())
                   << ",\"completed_steps\":" << completedSteps << ",\"step_seconds\":5"
+                  << ",\"endgame_result\":" << int(TheCampaign.EndgameResult)
                   << ",\"all_units_aggregate\":" << (DetailedRegionActive() ? "false" : "true")
                   << ",\"objectives\":" << objectiveCount
                   << ",\"units_before\":" << before.size() << ",\"units_after\":" << previous.size()

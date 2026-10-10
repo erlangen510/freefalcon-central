@@ -1061,9 +1061,15 @@ int ReadScriptedTriggerFile(char* filename)
                 if (sptr = strchr(token, ' '))
                     sptr++;
 
+#ifdef FF_HEADLESS
+                // No window receives FM_CAMPAIGN_OVER here; record the result as its handler
+                // (winmain.cpp) does, so the headless host can report the campaign's end.
+                TheCampaign.EndgameResult = static_cast<uchar>(atoi(sptr));
+#else
                 // Post the campaign over message
                 PostMessage(FalconDisplay.appWin, FM_CAMPAIGN_OVER, atoi(sptr),
                             1);
+#endif
                 continue;
             }
             else if (strcmp(token, "#RESET_BORDOM_TIMEOUT") == 0)

@@ -101,11 +101,16 @@ Success is exit code 0 and a final JSON report on stdout; diagnostics are on
 stderr. Invalid input/runtime errors use exit 1, usage errors exit 2, and an
 inspector-only build returns exit 3 for `run`.
 
-`conquest <data-root> <scenario-basename> <max-days> <log.jsonl> [seed]` runs the same
-loop for up to 365 days. The FF Korea dynamic campaign has no native end condition
-(`CheckForVictory` only serves Tactical Engagement), so the host defines one: it stops once
-a team holds every starting objective of a team it may capture ground from
-(`ROE_GROUND_CAPTURE`). The log has one line per ownership change (`capture`), an hourly
+`conquest <data-root> <scenario-basename> <max-days> <log.jsonl> [seed] [end-game]` runs the
+same loop for up to 365 days. The host adds its own end rule: it stops once a team holds every
+starting objective of a team it may capture ground from (`ROE_GROUND_CAPTURE`).
+FF Korea's own campaign end comes from the trigger script: `#END_GAME` (for example after
+`#IF_BORDOM_HOURS 240`, ten days without capturing a primary objective, or
+`#IF_CAMPAIGN_DAY G 15`) posts `FM_CAMPAIGN_OVER`, whose handler stores
+`TheCampaign.EndgameResult`. The headless host has no window, so `cmpevent.cpp` stores the result
+directly under `FF_HEADLESS`. The log records it as `campaign_over`, and the run report as
+`endgame_result`. With `end-game` the conquest run also stops there; without it, the run continues
+as before. The log has one line per ownership change (`capture`), an hourly
 per-team `status` (objectives held by start team and start country, battalions, vehicles,
 aircraft, initiative, ground action), `milestone` lines at 80% and 100%, and `end`.
 `python scripts/conquest-report.py <log.jsonl>` summarizes it. In FF Korea the DPRK team
@@ -121,6 +126,17 @@ remain aggregate. Active-list counts exclude inactive units in save headers.
 `reported_combat_losses` combines losses reported by native unit/feature damage
 processing; it is not an aircraft-loss statistic. Execution does not validate
 historical accuracy, balance, or victory outcomes.
+
+## Reduced scenarios
+
+`reduce-scenario <data-root> <scenario> <plan> <new-dir>` cuts a loaded scenario down to a grid box
+for small comparison wars and saves `<new-dir>/<name>.cam` and `<name>.tri` (and `<name>.lay` when
+the scenario has site layouts) before any planning; copy them into a data root's `campaign/SAVE`
+to run them as scenario `<name>`. Plan lines (`scenario_reduce.h` has the rules): `name`,
+`box x0 y0 x1 y1`, `units land|all`, `connected largest|all` and `triggers team|none|theater`. The
+reduced trigger script leaves out trigger blocks that name objectives or compare force ratios,
+since those refer to the whole theater. The parent workspace's `scripts/reduced-war.py` drives
+it.
 
 ## Battle service experiment
 

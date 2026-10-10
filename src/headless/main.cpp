@@ -15,7 +15,7 @@ int Run(const std::vector<std::string>& args) {
                      "Damage checkpoint diagnostic: ff-campaign damage-checkpoint-test <data-root> <scenario-name> <new-output-directory> [seed]\n"
                      "Equipment fault diagnostic: ff-campaign fault-checkpoint-test <data-root> <scenario-name> <new-output-directory> [seed]\n"
                      "Run: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\n"
-                     "Conquest: ff-campaign conquest <data-root> <scenario-name> <max-days> <log.jsonl> [seed] (stops once a team holds every starting objective of an enemy)\n"
+                     "Conquest: ff-campaign conquest <data-root> <scenario-name> <max-days> <log.jsonl> [seed] [end-game] (stops once a team holds every starting objective of an enemy; with end-game also at the trigger script's #END_GAME)\n"
                      "Checkpoint: ff-campaign checkpoint <data-root> <scenario-name> <new-output-directory> [seed] (advances one minute)\n"
                      "Checkpoint after: ff-campaign checkpoint-after <data-root> <scenario-name> <minutes> <new-output-directory> [seed]\n"
                      "Resume: ff-campaign resume <data-root> <checkpoint-directory> <minutes> [seed]\n"
@@ -24,12 +24,13 @@ int Run(const std::vector<std::string>& args) {
                      "Watch resume: ff-campaign watch-resume <data-root> <checkpoint-directory> <session-directory> [seed]\n"
                      "Remap theater: ff-campaign remap-theater <data-root> <scenario-name> <remap-file> <new-output-directory> (relocate onto the data root's grid, save checkpoint)\n"
                      "Rebuild objectives: ff-campaign rebuild-objectives <data-root> <scenario-name> <objectives-file> <new-output-directory> (open-data objective set, save checkpoint)\n"
+                     "Reduce scenario: ff-campaign reduce-scenario <data-root> <scenario-name> <plan-file> <new-output-directory> (small comparison war: <name>.cam and <name>.tri)\n"
                      "Export map: ff-campaign export-map <data-root> <scenario-name> <output-directory> (loaded state, no campaign time)\n"
                      "Export checkpoint: ff-campaign export-checkpoint <data-root> <checkpoint-dir> <output-directory>\n"
                      "Detail: ff-campaign detail-test <data-root> <scenario-name> <hit|miss|unarmed|air|ground|helo|sea|feature|region> [seed]\n";
         return 0;
     }
-    if (args.size() >= 2 && (args[1] == "run" || args[1] == "conquest" || args[1] == "checkpoint-after" || args[1] == "battle" || args[1] == "watch" || args[1] == "export-map" || args[1] == "export-checkpoint" || args[1] == "detail-test" || args[1] == "checkpoint" || args[1] == "resume" || args[1] == "watch-resume" || args[1] == "damage-checkpoint-test" || args[1] == "fault-checkpoint-test" || args[1] == "remap-theater" || args[1] == "rebuild-objectives")) {
+    if (args.size() >= 2 && (args[1] == "run" || args[1] == "conquest" || args[1] == "checkpoint-after" || args[1] == "battle" || args[1] == "watch" || args[1] == "export-map" || args[1] == "export-checkpoint" || args[1] == "detail-test" || args[1] == "checkpoint" || args[1] == "resume" || args[1] == "watch-resume" || args[1] == "damage-checkpoint-test" || args[1] == "fault-checkpoint-test" || args[1] == "remap-theater" || args[1] == "rebuild-objectives" || args[1] == "reduce-scenario")) {
 #ifdef FF_CAMPAIGN_ENGINE
         return RunLegacyCampaign(args);
 #else
