@@ -1107,6 +1107,11 @@ int AirTaskingManagerClass::BuildDivert(MissionRequest mis)
     else
         tr = MAX_FLYMISSION_THREAT;
 
+#ifdef FF_HEADLESS
+    static const bool traceDivert = getenv("FF_AIR_TRACE") != nullptr;
+    if (traceDivert and hs > tr)
+        fprintf(stderr, "[divert] %lu team %d mission %d threat %d limit %d\n", TheCampaign.CurrentTime, (int)mis->who, (int)mis->mission, hs, tr);
+#endif
     if (hs > tr)
         return PRET_CANCELED;
 
@@ -1127,6 +1132,11 @@ int AirTaskingManagerClass::BuildDivert(MissionRequest mis)
         if (target and (target->IsPackage() or target->IsBrigade()))
             target = ((Unit)target)->GetFirstUnitElement();
 
+#ifdef FF_HEADLESS
+        if (traceDivert)
+            fprintf(stderr, "[divert] %lu team %d mission %d no flight target %d broken %d\n", TheCampaign.CurrentTime, (int)mis->who, (int)mis->mission,
+                    target ? 1 : 0, (target and target->IsUnit() and ((Unit)target)->Broken()) ? 1 : 0);
+#endif
         if (not target or (target->IsUnit() and ((Unit)target)->Broken()))
             return PRET_CANCELED;
 
