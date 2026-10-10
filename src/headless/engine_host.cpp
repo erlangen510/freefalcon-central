@@ -17,6 +17,7 @@
 #include "falcsess.h"
 #include "asearch.h"
 #include "boundary.h"
+#include "profile.h"
 #include <chrono>
 #include <filesystem>
 #include <iostream>
@@ -166,6 +167,131 @@ static void validateData(const std::filesystem::path& data) {
     }
 }
 
+// conquest: JSON lines with every objective ownership change, an hourly per-team status and the
+// milestones of one team holding 80% and then all of an enemy team's starting objectives.
+class ConquestLog {
+public:
+    ConquestLog(const std::filesystem::path& file, CampaignTime start) : out(file, std::ios::binary), start(start) {
+        if(!out) throw std::runtime_error("Cannot open conquest log: " + file.u8string());
+        VuListIterator it(AllObjList);
+        for(VuEntity* e=it.GetFirst();e;e=it.GetNext()) {
+            const Control owner=static_cast<Objective>(e)->GetOwner();
+            startTeam[e->Id()]=GetTeam(owner); startCountry[e->Id()]=owner; lastOwner[e->Id()]=owner;
+            ++startCount[GetTeam(owner)]; ++held[GetTeam(owner)][GetTeam(owner)];
+        }
+        out<<"{\"type\":\"start\","<<clock(start)<<",\"teams\":[";
+        bool comma=false;
+        for(int t=0;t<NUM_TEAMS;++t) {
+            if(!startCount[t]) continue;
+            out<<(comma?",":"")<<"{\"team\":"<<t<<",\"name\":"<<ff::headless::JsonString(TeamInfo[t]->GetName())<<",\"objectives\":"<<startCount[t]<<",\"enemies\":[";
+            comma=true;
+            bool c2=false;
+            for(int d=0;d<NUM_TEAMS;++d) if(atWar(t,d)) {out<<(c2?",":"")<<d;c2=true;}
+            out<<"]}";
+        }
+        out<<"]}\n";out.flush();
+    }
+    // Records ownership changes since the last step; true once a team holds all of an enemy's objectives.
+    bool step() {
+        VuListIterator it(AllObjList);
+        for(VuEntity* e=it.GetFirst();e;e=it.GetNext()) {
+            const auto o=static_cast<Objective>(e);
+            auto last=lastOwner.find(e->Id());
+            if(last==lastOwner.end() || last->second==o->GetOwner()) continue;
+            const int from=last->second, to=o->GetOwner(), d=startTeam[e->Id()];
+            --held[GetTeam(from)][d]; ++held[GetTeam(to)][d];
+            last->second=static_cast<Control>(to);
+            ++captures;
+            _TCHAR name[80]="";o->GetName(name,sizeof name,FALSE);
+            short x,y;o->GetLocation(&x,&y);
+            out<<"{\"type\":\"capture\","<<clock(TheCampaign.CurrentTime)<<",\"id\":\""<<e->Id().creator_<<':'<<e->Id().num_<<"\",\"name\":"
+               <<ff::headless::JsonString(name)<<",\"objective_type\":"<<int(o->GetType())<<",\"x\":"<<x<<",\"y\":"<<y
+               <<",\"from_country\":"<<from<<",\"to_country\":"<<to<<",\"from_team\":"<<int(GetTeam(from))<<",\"to_team\":"<<int(GetTeam(to))
+               <<",\"start_team\":"<<d<<"}\n";
+        }
+        bool complete=false;
+        for(int a=0;a<NUM_TEAMS;++a) for(int d=0;d<NUM_TEAMS;++d) {
+            if(!atWar(a,d)) continue;
+            for(int m=0;m<2;++m) {
+                const bool reached=held[a][d]*(m?1:5)>=startCount[d]*(m?1:4);
+                if(!reached || milestone[m][a][d]) continue;
+                milestone[m][a][d]=true;
+                out<<"{\"type\":\"milestone\","<<clock(TheCampaign.CurrentTime)<<",\"attacker\":"<<a<<",\"defender\":"<<d
+                   <<",\"share\":"<<(m?"1.0":"0.8")<<",\"held\":"<<held[a][d]<<",\"of\":"<<startCount[d]<<"}\n";
+                out.flush();
+            }
+            complete|=milestone[1][a][d];
+        }
+        return complete;
+    }
+    void status() {
+        struct Forces {int battalions=0,groundVehicles=0,brigades=0,squadrons=0,aircraft=0,flights=0,taskForces=0,ships=0;} forces[NUM_TEAMS];
+        VuListIterator it(AllUnitList);
+        for(Unit u=static_cast<Unit>(it.GetFirst());u;u=static_cast<Unit>(it.GetNext())) {
+            if(u->IsDead()) continue;
+            auto& f=forces[u->GetTeam()];
+            if(u->IsBattalion()) {++f.battalions;f.groundVehicles+=u->GetTotalVehicles();}
+            else if(u->IsBrigade()) ++f.brigades;
+            else if(u->IsSquadron()) {++f.squadrons;f.aircraft+=u->GetTotalVehicles();}
+            else if(u->IsFlight()) ++f.flights;
+            else if(u->IsTaskForce()) {++f.taskForces;f.ships+=u->GetTotalVehicles();}
+        }
+        // Start country -> objectives each team holds now.
+        int byCountry[NUM_COUNS][NUM_TEAMS]={};
+        for(const auto& [id,country]:startCountry) ++byCountry[country][GetTeam(lastOwner[id])];
+        out<<"{\"type\":\"status\","<<clock(TheCampaign.CurrentTime)<<",\"captures\":"<<captures
+           <<",\"combat_messages\":"<<ff_headless::combat.engagements<<",\"reported_combat_losses\":"<<ff_headless::combat.losses<<",\"teams\":[";
+        bool comma=false;
+        for(int t=0;t<NUM_TEAMS;++t) {
+            if(!startCount[t] && !forces[t].battalions && !forces[t].squadrons) continue;
+            const auto& f=forces[t];
+            const auto* s=TeamInfo[t]->GetCurrentStats();
+            const auto* g=TeamInfo[t]->GetGroundAction();
+            _TCHAR target[80]="";
+            if(const auto o=static_cast<Objective>(vuDatabase->Find(g->actionObjective))) o->GetName(target,sizeof target,FALSE);
+            int owned=0;for(int d=0;d<NUM_TEAMS;++d) owned+=held[t][d];
+            out<<(comma?",":"")<<"{\"team\":"<<t<<",\"objectives\":"<<owned<<",\"held_from\":[";
+            comma=true;
+            for(int d=0;d<NUM_TEAMS;++d) out<<(d?",":"")<<held[t][d];
+            out<<"],\"battalions\":"<<f.battalions<<",\"ground_vehicles\":"<<f.groundVehicles<<",\"brigades\":"<<f.brigades
+               <<",\"squadrons\":"<<f.squadrons<<",\"aircraft\":"<<f.aircraft<<",\"flights\":"<<f.flights
+               <<",\"task_forces\":"<<f.taskForces<<",\"ships\":"<<f.ships
+               <<",\"initiative\":"<<TeamInfo[t]->GetInitiative()<<",\"ground_action\":"<<int(g->actionType)
+               <<",\"action_objective\":"<<ff::headless::JsonString(target)
+               <<",\"stats\":{\"ground_vehicles\":"<<s->groundVehs<<",\"aircraft\":"<<s->aircraft<<",\"air_defense\":"<<s->airDefenseVehs
+               <<",\"ships\":"<<s->ships<<",\"supply\":"<<s->supply<<",\"fuel\":"<<s->fuel<<",\"airbases\":"<<s->airbases
+               <<",\"supply_level\":"<<int(s->supplyLevel)<<",\"fuel_level\":"<<int(s->fuelLevel)<<"}}";
+        }
+        out<<"],\"by_start_country\":{";
+        comma=false;
+        for(int c=0;c<NUM_COUNS;++c) {
+            int total=0;for(int t=0;t<NUM_TEAMS;++t) total+=byCountry[c][t];
+            if(!total) continue;
+            out<<(comma?",":"")<<'"'<<c<<"\":[";comma=true;
+            for(int t=0;t<NUM_TEAMS;++t) out<<(t?",":"")<<byCountry[c][t];
+            out<<']';
+        }
+        out<<"}}\n";out.flush();
+    }
+    void finish(const char* reason) {
+        out<<"{\"type\":\"end\","<<clock(TheCampaign.CurrentTime)<<",\"reason\":\""<<reason<<"\",\"captures\":"<<captures<<"}\n";out.flush();
+    }
+private:
+    static bool atWar(int a,int d) {return a!=d && a!=TEAM_NEUTRAL && TeamInfo[a] && TeamInfo[d] && GetRoE(a,d,ROE_GROUND_CAPTURE)==ROE_ALLOWED;}
+    std::string clock(CampaignTime t) const {
+        char text[96];
+        snprintf(text,sizeof text,"\"elapsed_minutes\":%lu,\"campaign_day\":%lu,\"clock\":\"%02lu:%02lu\"",
+            (t-start)/CampaignMinutes,t/CampaignDay+1,t%CampaignDay/CampaignHours,t%CampaignHours/CampaignMinutes);
+        return text;
+    }
+    std::ofstream out;
+    CampaignTime start;
+    std::map<VU_ID,int> startTeam;
+    std::map<VU_ID,Control> startCountry,lastOwner;
+    int startCount[NUM_TEAMS]={},held[NUM_TEAMS][NUM_TEAMS]={},captures=0;
+    bool milestone[2][NUM_TEAMS][NUM_TEAMS]={};
+};
+
 int RunLegacyCampaign(const std::vector<std::string>& args) {
     // CampaignThread and SimLoop normally configure this per-thread. The
     // headless host replaces both loops and must preserve their numeric mode.
@@ -175,8 +301,12 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
     bool campaignLoaded = false;
     std::unique_ptr<CampaignWatch> watch;
     try {
-        if (args.size() != 5 && args.size() != 6) { std::cerr << "{\"status\":\"error\",\"simulation_advanced\":false,\"error\":\"Usage: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\"}\n"; return 2; }
+        // conquest <data-root> <scenario> <max-days> <log.jsonl> [seed]
+        const bool conquest = args[1] == "conquest";
+        const size_t seedIndex = conquest ? 6 : 5;
+        if (args.size() != seedIndex && args.size() != seedIndex + 1) { std::cerr << "{\"status\":\"error\",\"simulation_advanced\":false,\"error\":\"Usage: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\"}\n"; return 2; }
         const auto data = std::filesystem::absolute(std::filesystem::u8path(args[2]));
+        const auto conquestLogFile = conquest ? std::filesystem::absolute(std::filesystem::u8path(args[5])) : std::filesystem::path();
         const bool exportMap = args[1] == "export-map";
         const bool interactive = args[1] == "watch" || args[1] == "watch-resume" || exportMap;
         if (interactive) watch = std::make_unique<CampaignWatch>(std::filesystem::absolute(std::filesystem::u8path(args[4])));
@@ -196,15 +326,16 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
             setPath(archivePath,checkpointDirectory / "checkpoint.cam");
         }
         if((checkpoint||remap) && std::filesystem::exists(checkpointDirectory)) throw std::runtime_error("Checkpoint output directory must not already exist");
-        const int minutes = interactive ? 10080 : (diagnostic||checkpoint||remap) ? 1 : std::stoi(args[4], &parsed);
+        const int minutes = interactive ? 10080 : (diagnostic||checkpoint||remap) ? 1 : std::stoi(args[4], &parsed) * (conquest ? 1440 : 1);
         if (!interactive && !diagnostic && !checkpoint && !remap && parsed != args[4].size()) throw std::runtime_error("Invalid duration");
         unsigned seed = 1;
-        if (args.size() == 6 && !remap) {
-            const auto value = std::stoull(args[5], &parsed);
-            if (parsed != args[5].size() || value > UINT_MAX || args[5][0] == '-') throw std::runtime_error("Invalid seed");
+        if (args.size() == seedIndex + 1 && !remap) {
+            const auto value = std::stoull(args[seedIndex], &parsed);
+            if (parsed != args[seedIndex].size() || value > UINT_MAX || args[seedIndex][0] == '-') throw std::runtime_error("Invalid seed");
             seed = static_cast<unsigned>(value);
         }
-        if (minutes < 1 || minutes > 10080) throw std::runtime_error("Duration must be 1..10080 minutes");
+        if (conquest ? minutes < 1440 || minutes > 365 * 1440 : minutes < 1 || minutes > 10080)
+            throw std::runtime_error(conquest ? "Duration must be 1..365 days" : "Duration must be 1..10080 minutes");
         char scenario[64];
         const auto scenarioName=resume?std::string("checkpoint"):args[3];
         if (scenarioName.empty() || scenarioName.size() >= sizeof(scenario)) throw std::runtime_error("Invalid scenario name");
@@ -313,31 +444,49 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         }
         if(!resume) DoCampaignLoop(1);
         if (watch) watch->initialize(scenario);
+        std::unique_ptr<ConquestLog> conquestLog;
+        if (conquest) { conquestLog = std::make_unique<ConquestLog>(conquestLogFile, start); conquestLog->status(); }
+        const char* stopReason = "duration";
         CampaignTime nextCampaignTick = start + 5000;
         for (int second = 0; second < minutes * 60;) {
-            if (watch && !watch->waitForStep()) break;
+            if (watch) {
+                FF_PROFILE(PROFILE_WATCH_WAIT);
+                if (!watch->waitForStep()) break;
+            }
             const unsigned frameMs = watch ? watch->stepMilliseconds() : 5000;
-            if (DetailedRegionActive()) AdvanceDetailedFrame();
+            if (DetailedRegionActive()) { FF_PROFILE(PROFILE_DETAILED_FRAME); AdvanceDetailedFrame(); }
             else SetTime(TheCampaign.CurrentTime + frameMs);
             if (TheCampaign.CurrentTime < nextCampaignTick) continue;
             nextCampaignTick += 5000; second += 5;
-            DoCampaignLoop(0);
-            UpdateRealUnits(5 * CampaignSeconds);
-            TheCampaign.vuThread->Update(-1);
-            gMainThread->Update(-1);
-            if (DetailedRegionActive()) ReconcileDetailedRegion();
-            const auto current = captureUnits();
-            for (const auto& [id, state] : current) {
-                const auto old = previous.find(id);
-                if (old == previous.end()) { if (state.flight) createdFlights.insert(id); continue; }
-                if (old->second.x != state.x || old->second.y != state.y) moved.insert(id);
-                if (old->second.vehicles != state.vehicles) strengthChanged.insert(id);
-                if (old->second.supply != state.supply) supplyChanged.insert(id);
-                if (old->second.orders != state.orders) ordersChanged.insert(id);
+            { FF_PROFILE(PROFILE_CAMPAIGN_LOOP); DoCampaignLoop(0); }
+            { FF_PROFILE(PROFILE_UPDATE_REAL_UNITS); UpdateRealUnits(5 * CampaignSeconds); }
+            { FF_PROFILE(PROFILE_VU_THREAD); TheCampaign.vuThread->Update(-1); }
+            { FF_PROFILE(PROFILE_MAIN_THREAD); gMainThread->Update(-1); }
+            if (DetailedRegionActive()) { FF_PROFILE(PROFILE_DETAILED_RECONCILE); ReconcileDetailedRegion(); }
+            {
+                FF_PROFILE(PROFILE_HOST_UNIT_CAPTURE);
+                const auto current = captureUnits();
+                for (const auto& [id, state] : current) {
+                    const auto old = previous.find(id);
+                    if (old == previous.end()) { if (state.flight) createdFlights.insert(id); continue; }
+                    if (old->second.x != state.x || old->second.y != state.y) moved.insert(id);
+                    if (old->second.vehicles != state.vehicles) strengthChanged.insert(id);
+                    if (old->second.supply != state.supply) supplyChanged.insert(id);
+                    if (old->second.orders != state.orders) ordersChanged.insert(id);
+                }
+                previous = current;
             }
-            previous = current;
             ++completedSteps;
+            if (second % 3600 == 0) ff_headless::ProfileWrite((TheCampaign.CurrentTime - start) / CampaignMinutes, completedSteps);
+            if (conquestLog) {
+                FF_PROFILE(PROFILE_CONQUEST_LOG);
+                const bool complete = conquestLog->step();
+                if (second % 3600 == 0 || complete) conquestLog->status();
+                if (complete) { stopReason = "conquest"; break; }
+            }
         }
+        ff_headless::ProfileWrite((TheCampaign.CurrentTime - start) / CampaignMinutes, completedSteps);
+        if (conquestLog) conquestLog->finish(stopReason);
         if (watch) watch->publish("stopped");
         UnitStates savedUnits;
         if(checkpoint) {
@@ -353,6 +502,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
                   << ",\"end_ms\":" << TheCampaign.CurrentTime
                   << ",\"scenario\":" << ff::headless::JsonString(scenario)
                   << ",\"seed\":" << seed << ",\"format_version\":" << inspected.version
+                  << (conquest ? std::string(",\"stop_reason\":\"") + stopReason + "\"" : std::string())
                   << ",\"completed_steps\":" << completedSteps << ",\"step_seconds\":5"
                   << ",\"all_units_aggregate\":" << (DetailedRegionActive() ? "false" : "true")
                   << ",\"objectives\":" << objectiveCount

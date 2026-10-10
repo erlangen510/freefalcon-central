@@ -26,6 +26,7 @@
 #include <map>
 #include <cmath>
 #include <charconv>
+#include "profile.h"
 extern short NumWeaponTypes;
 
 namespace {
@@ -299,6 +300,7 @@ bool CampaignWatch::waitForStep() {
 }
 
 void CampaignWatch::publish(const char* status) {
+    FF_PROFILE(PROFILE_WATCH_PUBLISH);
     std::ostringstream out;
     out << "{\"schema\":2,\"frame\":" << ++frame << ",\"status\":" << text(status)
         << ",\"time_ms\":" << TheCampaign.CurrentTime << ",\"ack\":" << sequence
@@ -431,6 +433,7 @@ void CampaignWatch::publish(const char* status) {
         out << "]}";
     }
     out << "]}";
+    ff_headless::ProfileSnapshotBytes(static_cast<size_t>(out.tellp()));
     write("state.json", out.str());
     sent = Clock::now();
 }

@@ -3182,12 +3182,20 @@ void UnitClass::SetInactive(int f)
 
             InactiveList->Remove(this);
 
-            AllUnitList->Insert(this);
-            AllParentList->Insert(this);
+            // A unit loaded and unloaded before UpdateRealUnits inactivated it is still listed;
+            // the lists accept duplicates, so only insert where it is missing.
+            if (not AllUnitList->Find(this))
+                AllUnitList->Insert(this);
+
+            if (not AllParentList->Find(this))
+                AllParentList->Insert(this);
 
             if (Real())
             {
-                AllRealList->Insert(this);
+                if (not AllRealList->Find(this))
+                    AllRealList->Insert(this);
+
+                RealUnitProxList->Remove(this);
                 RealUnitProxList->Insert(this);
             }
         }

@@ -8,6 +8,9 @@ add_library(ff_scenario STATIC scenario.cpp ${FF_ROOT}/utils/lzss.cpp)
 target_include_directories(ff_scenario PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${FF_ROOT})
 add_executable(ff-campaign main.cpp)
 target_link_libraries(ff-campaign PRIVATE ff_scenario)
+if(WIN32)
+  target_link_libraries(ff-campaign PRIVATE dbghelp)
+endif()
 option(BUILD_TESTING "Build standalone scenario tests" ON)
 enable_testing()
 if(BUILD_TESTING)
@@ -66,7 +69,7 @@ engine_library(ff_lists codelib/tools/lists/lists.vcxproj)
 engine_library(ff_campui campaign/campui/campui.vcxproj)
 engine_library(ff_comms comms/comms.vcxproj)
 add_library(ff_campaign_engine STATIC engine_host.cpp ${FF_ROOT}/ui/src/f4config.cpp ${FF_ROOT}/utils/lzss.cpp ${FF_ROOT}/tools/isbad/isbad.cpp ${FF_ROOT}/extlibs/tinyxml2/tinyxml2.cpp)
-target_sources(ff_campaign_engine PRIVATE presentation.cpp model_support.cpp terrain.cpp watch.cpp commander.cpp theater_remap.cpp objective_rebuild.cpp objective_layout.cpp
+target_sources(ff_campaign_engine PRIVATE presentation.cpp model_support.cpp terrain.cpp watch.cpp profile.cpp commander.cpp theater_remap.cpp objective_rebuild.cpp objective_layout.cpp
   ${FF_ROOT}/falcsnd/voicemapper.cpp
   ${FF_ROOT}/sim/navaids/tacan.cpp
   ${FF_ROOT}/sim/missile/readin.cpp

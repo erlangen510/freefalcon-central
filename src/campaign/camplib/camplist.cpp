@@ -81,11 +81,8 @@ VU_BOOL UnitFilter::RemoveTest(VuEntity *e)
     if (host and not e->IsLocal())
         return FALSE;
 
-    if (not inactive and ((Unit)e)->Inactive())
-        return FALSE;
-    else if (inactive and not((Unit)e)->Inactive())
-        return FALSE;
-
+    // Membership follows the inactive flag, which changes while a unit is listed, so it
+    // cannot gate removal: InactivateUnit and SetInactive(0) run after the flag flips.
     return TRUE;
 }
 
@@ -138,9 +135,8 @@ VU_BOOL AirUnitFilter::RemoveTest(VuEntity *e)
     if (host and not e->IsLocal())
         return FALSE;
 
-    if (((Unit)e)->Inactive())
-        return FALSE;
-
+    // Membership follows the inactive flag, which changes while a unit is listed, so it
+    // cannot gate removal: InactivateUnit and SetInactive(0) run after the flag flips.
     return TRUE;
 }
 
@@ -193,9 +189,8 @@ VU_BOOL GroundUnitFilter::RemoveTest(VuEntity *e)
     if (host and not e->IsLocal())
         return FALSE;
 
-    if (((Unit)e)->Inactive())
-        return FALSE;
-
+    // Membership follows the inactive flag, which changes while a unit is listed, so it
+    // cannot gate removal: InactivateUnit and SetInactive(0) run after the flag flips.
     return TRUE;
 }
 
@@ -248,9 +243,8 @@ VU_BOOL NavalUnitFilter::RemoveTest(VuEntity *e)
     if (host and not e->IsLocal())
         return FALSE;
 
-    if (((Unit)e)->Inactive())
-        return FALSE;
-
+    // Membership follows the inactive flag, which changes while a unit is listed, so it
+    // cannot gate removal: InactivateUnit and SetInactive(0) run after the flag flips.
     return TRUE;
 }
 
@@ -1372,6 +1366,7 @@ void InactivateUnit(UnitClass *unit)
     AllParentList->Remove(unit);
     AllRealList->Remove(unit);
     RealUnitProxList->Remove(unit);
-    // insert into inactive
-    InactiveList->Insert(unit);
+    // insert into inactive (the list accepts duplicates)
+    if (not InactiveList->Find(unit))
+        InactiveList->Insert(unit);
 }

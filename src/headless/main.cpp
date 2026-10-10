@@ -15,6 +15,7 @@ int Run(const std::vector<std::string>& args) {
                      "Damage checkpoint diagnostic: ff-campaign damage-checkpoint-test <data-root> <scenario-name> <new-output-directory> [seed]\n"
                      "Equipment fault diagnostic: ff-campaign fault-checkpoint-test <data-root> <scenario-name> <new-output-directory> [seed]\n"
                      "Run: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\n"
+                     "Conquest: ff-campaign conquest <data-root> <scenario-name> <max-days> <log.jsonl> [seed] (stops once a team holds every starting objective of an enemy)\n"
                      "Checkpoint: ff-campaign checkpoint <data-root> <scenario-name> <new-output-directory> [seed] (advances one minute)\n"
                      "Resume: ff-campaign resume <data-root> <checkpoint-directory> <minutes> [seed]\n"
                      "Watch: ff-campaign watch <data-root> <scenario-name> <session-directory> [seed]\n"
@@ -25,7 +26,7 @@ int Run(const std::vector<std::string>& args) {
                      "Detail: ff-campaign detail-test <data-root> <scenario-name> <hit|miss|unarmed|air|ground|helo|sea|feature|region> [seed]\n";
         return 0;
     }
-    if (args.size() >= 2 && (args[1] == "run" || args[1] == "watch" || args[1] == "export-map" || args[1] == "detail-test" || args[1] == "checkpoint" || args[1] == "resume" || args[1] == "watch-resume" || args[1] == "damage-checkpoint-test" || args[1] == "fault-checkpoint-test" || args[1] == "remap-theater" || args[1] == "rebuild-objectives")) {
+    if (args.size() >= 2 && (args[1] == "run" || args[1] == "conquest" || args[1] == "watch" || args[1] == "export-map" || args[1] == "detail-test" || args[1] == "checkpoint" || args[1] == "resume" || args[1] == "watch-resume" || args[1] == "damage-checkpoint-test" || args[1] == "fault-checkpoint-test" || args[1] == "remap-theater" || args[1] == "rebuild-objectives")) {
 #ifdef FF_CAMPAIGN_ENGINE
         return RunLegacyCampaign(args);
 #else
@@ -55,7 +56,46 @@ int Run(const std::vector<std::string>& args) {
 }
 
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <dbghelp.h>
+#include <cstdio>
+// Unhandled native faults (access violations in the legacy engine) print a symbolized
+// stack to stderr before the process dies, so long unattended runs leave evidence.
+static LONG WINAPI ReportCrash(EXCEPTION_POINTERS* info) {
+    const HANDLE process = GetCurrentProcess();
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    SymInitialize(process, nullptr, TRUE);
+    const auto* record = info->ExceptionRecord;
+    fprintf(stderr, "{\"status\":\"crash\",\"code\":\"%08lx\",\"address\":\"%p\",\"access\":%llu,\"target\":\"%llx\"}\n",
+            record->ExceptionCode, record->ExceptionAddress,
+            record->NumberParameters > 0 ? static_cast<unsigned long long>(record->ExceptionInformation[0]) : 0ull,
+            record->NumberParameters > 1 ? static_cast<unsigned long long>(record->ExceptionInformation[1]) : 0ull);
+    CONTEXT context = *info->ContextRecord;
+    STACKFRAME64 frame{};
+    frame.AddrPC = {context.Rip, 0, AddrModeFlat};
+    frame.AddrStack = {context.Rsp, 0, AddrModeFlat};
+    frame.AddrFrame = {context.Rbp, 0, AddrModeFlat};
+    for (int i = 0; i < 40 && StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, GetCurrentThread(), &frame, &context, nullptr,
+                                          SymFunctionTableAccess64, SymGetModuleBase64, nullptr); ++i) {
+        alignas(SYMBOL_INFO) char bytes[sizeof(SYMBOL_INFO) + MAX_SYM_NAME] = {};
+        auto* symbol = reinterpret_cast<SYMBOL_INFO*>(bytes);
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO); symbol->MaxNameLen = MAX_SYM_NAME;
+        DWORD64 offset = 0;
+        if (!SymFromAddr(process, frame.AddrPC.Offset, &offset, symbol)) strcpy(symbol->Name, "?");
+        IMAGEHLP_LINE64 line{sizeof(line)}; DWORD displacement = 0;
+        const bool hasLine = SymGetLineFromAddr64(process, frame.AddrPC.Offset, &displacement, &line);
+        fprintf(stderr, "  %llx %s+%llu %s:%lu\n", frame.AddrPC.Offset, symbol->Name, offset,
+                hasLine ? line.FileName : "", hasLine ? line.LineNumber : 0ul);
+    }
+    fflush(stderr);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 int wmain(int argc, wchar_t** argv) {
+    SetUnhandledExceptionFilter(ReportCrash);
     std::vector<std::string> args;
     for (int i = 0; i < argc; ++i) args.push_back(std::filesystem::path(argv[i]).u8string());
     return Run(args);

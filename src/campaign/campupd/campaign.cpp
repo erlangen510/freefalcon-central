@@ -1,5 +1,8 @@
 #ifdef FF_HEADLESS
 #include "headless/boundary.h"
+#include "headless/profile.h"
+#else
+#define FF_PROFILE(section)
 #endif
 #include <algorithm>
 
@@ -2967,6 +2970,7 @@ void DoCampaignLoop(int startup)
 
     if (startup)
     {
+        FF_PROFILE(PROFILE_STARTUP);
         // Do all items
         CheckNewDay();
 
@@ -2996,6 +3000,8 @@ void DoCampaignLoop(int startup)
         switch (stage)
         {
         case STAGE_1:
+        {
+            FF_PROFILE(PROFILE_STAGE1_DAY_REINFORCE_STATS);
             // Check for new day
             CheckNewDay();
 
@@ -3011,71 +3017,107 @@ void DoCampaignLoop(int startup)
                             game_Campaign);
 
             break;
+        }
 
         case STAGE_4:
-
-            // Supply and repair units
-            for (t = 0; t < NUM_TEAMS; t++)
-                SupplyUnits(t, CampaignHours);
+        {
+            {
+                FF_PROFILE(PROFILE_STAGE4_SUPPLY);
+                // Supply and repair units
+                for (t = 0; t < NUM_TEAMS; t++)
+                    SupplyUnits(t, CampaignHours);
+            }
 
             // Plan ground and naval units
+            FF_PROFILE(PROFILE_STAGE4_PLAN_GROUND);
             PlanGroundAndNavalUnits(&planCount);
             break;
+        }
 
         case STAGE_7:
+        {
+            FF_PROFILE(PROFILE_STAGE7_ORDER_GROUND);
             // Order ground and naval units
             OrderGroundAndNavalUnits();
             break;
+        }
 
         case STAGE_10:
-            // Repair objectives
-            RepairObjectives();
-            // Produce supplies
-            ProduceSupplies(CampaignHours);
+        {
+            {
+                FF_PROFILE(PROFILE_STAGE10_REPAIR_PRODUCE);
+                // Repair objectives
+                RepairObjectives();
+                // Produce supplies
+                ProduceSupplies(CampaignHours);
+            }
 
+            FF_PROFILE(PROFILE_STAGE10_SUPPLY);
             // Supply and repair units
             for (t = 0; t < NUM_TEAMS; t++)
                 SupplyUnits(t, CampaignHours);
 
             break;
+        }
 
         default:
             break;
         }
 
         // Rebuild lists
-        StandardRebuild();
+        {
+            FF_PROFILE(PROFILE_STANDARD_REBUILD);
+            StandardRebuild();
+        }
 
         // Check Triggers
-        CheckTriggers(TheCampaign.Scenario);
+        {
+            FF_PROFILE(PROFILE_CHECK_TRIGGERS);
+            CheckTriggers(TheCampaign.Scenario);
+        }
 
         // Plan Air
-        RebuildATMLists();
-
-        for (t = 0; t < NUM_TEAMS; t++)
         {
-            if (TeamInfo[t])
+            FF_PROFILE(PROFILE_REBUILD_ATM_LISTS);
+            RebuildATMLists();
+        }
+
+        {
+            FF_PROFILE(PROFILE_ATM_CALCULATIONS);
+            for (t = 0; t < NUM_TEAMS; t++)
             {
-                TeamInfo[t]->atm->DoCalculations();
+                if (TeamInfo[t])
+                {
+                    TeamInfo[t]->atm->DoCalculations();
+                }
             }
         }
 
-        for (t = 1; t < NUM_TEAMS; t++)
         {
-            if (TeamInfo[t])
+            FF_PROFILE(PROFILE_SELECT_AIR_ACTIONS);
+            for (t = 1; t < NUM_TEAMS; t++)
             {
-                TeamInfo[t]->SelectAirActions();
+                if (TeamInfo[t])
+                {
+                    TeamInfo[t]->SelectAirActions();
+                }
             }
         }
 
         // Order parent units
-        UpdateParentUnits(CAMPAIGN_STAGE_TIME_MINUTES * CampaignMinutes);
+        {
+            FF_PROFILE(PROFILE_UPDATE_PARENT_UNITS);
+            UpdateParentUnits(CAMPAIGN_STAGE_TIME_MINUTES * CampaignMinutes);
+        }
 
         lastStage = stage;
     }
 
     // Check any pending divert missions
-    CheckDivertStatus(DIVERT_NO_DIVERT);
+    {
+        FF_PROFILE(PROFILE_DIVERT_STATUS);
+        CheckDivertStatus(DIVERT_NO_DIVERT);
+    }
 
     // Update weather when in UI
     #ifdef FF_HEADLESS
@@ -3084,16 +3126,20 @@ void DoCampaignLoop(int startup)
     if (not SimDriver.InSim())
 #endif
     {
+        FF_PROFILE(PROFILE_WEATHER);
         ((WeatherClass *)realWeather)
             ->UpdateWeather(); // Sim calls this otherwise
     }
 
     // Task air
-    for (t = 0; t < NUM_TEAMS; t++)
     {
-        if (TeamInfo[t] and TeamInfo[t]->atm)
+        FF_PROFILE(PROFILE_ATM_TASK);
+        for (t = 0; t < NUM_TEAMS; t++)
         {
-            TeamInfo[t]->atm->Task();
+            if (TeamInfo[t] and TeamInfo[t]->atm)
+            {
+                TeamInfo[t]->atm->Task();
+            }
         }
     }
 
@@ -3188,6 +3234,17 @@ void UpdateRealUnits(CampaignTime deltatime)
         else
         {
             //START_PROFILE("CA UPD REAL UNIT");
+#ifdef FF_HEADLESS
+            if (u and ff_headless::profileEnabled)
+            {
+                FF_PROFILE_KIND(u->IsFlight() ? ff_headless::PROFILE_UNITS_FLIGHT :
+                                u->IsBattalion() ? ff_headless::PROFILE_UNITS_BATTALION :
+                                u->IsTaskForce() ? ff_headless::PROFILE_UNITS_TASK_FORCE :
+                                ff_headless::PROFILE_UNITS_OTHER);
+                UpdateUnit(u, deltatime);
+            }
+            else
+#endif
             if (u)
                 UpdateUnit(u, deltatime);
 
