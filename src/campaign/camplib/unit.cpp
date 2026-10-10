@@ -748,6 +748,17 @@ int UnitClass::ApplyDamage(FalconCampWeaponsFire* cwfm, uchar bonusToHit)
         }
     }
 
+#ifdef FF_HEADLESS
+    // FF_COMBAT_TRACE=1: one stderr line per resolved barrage (headless diagnostics; reads state only).
+    static const bool traceCombat = getenv("FF_COMBAT_TRACE") != nullptr;
+    if (traceCombat)
+        fprintf(stderr, "[combat] %lu %lu:%lu(%d,%d) fires at %lu:%lu(%d,%d) range %d shots %d lost %d\n",
+                TheCampaign.CurrentTime, shooter->Id().creator_, shooter->Id().num_, sx, sy, Id().creator_, Id().num_, tx, ty,
+                range, totalShots, currentLosses);
+    if (traceCombat)
+        for (int w = 0; w < MAX_TYPES_PER_CAMP_FIRE_MESSAGE and cwfm->dataBlock.weapon[w]; ++w)
+            fprintf(stderr, "[combat]   weapon %d shots %d\n", cwfm->dataBlock.weapon[w], cwfm->dataBlock.shots[w]);
+#endif
     // Check morale
     MoraleCheck(totalShots, currentLosses);
     *gDamageStatusPtr = (uchar)GetUnitMorale();

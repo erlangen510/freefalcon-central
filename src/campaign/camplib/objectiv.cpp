@@ -3536,6 +3536,19 @@ void CaptureObjective(Objective co, Control who, Unit u)
         newEvent->dataBlock.data.formatId = 1830;
     }
 
+#ifdef FF_HEADLESS
+    // FF_COMBAT_TRACE=1: one stderr line per capture (headless diagnostics; reads state only).
+    static const bool traceCapture = getenv("FF_COMBAT_TRACE") != nullptr;
+    if (traceCapture)
+    {
+        GridIndex cx, cy, ux = -1, uy = -1;
+        co->GetLocation(&cx, &cy);
+        if (u) u->GetLocation(&ux, &uy);
+        fprintf(stderr, "[capture] %lu %lu:%lu(%d,%d) by %lu:%lu(%d,%d) team %d orders %d\n", TheCampaign.CurrentTime,
+                co->Id().creator_, co->Id().num_, cx, cy, u ? u->Id().creator_ : 0, u ? u->Id().num_ : 0, ux, uy, (int)newown,
+                u ? u->GetUnitOrders() : -1);
+    }
+#endif
     co->SetDelta(1);
     co->SendObjMessage(vuid, FalconObjectiveMessage::objCaptured, newown, 0, 0);
     newEvent->dataBlock.team = GetTeam(who);

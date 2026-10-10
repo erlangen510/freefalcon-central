@@ -150,6 +150,17 @@ writes `<new-dir>/result.json`, with a result diff and an audit of every unit's 
 objective's native record inside and outside the region. Used by the parent workspace's
 `scripts/battle-experiment.py`; findings are in `migration/PHASE2-BATTLE.md`.
 
+## Diagnostics
+
+Headless builds only; each reads state and changes nothing. `FF_COMBAT_TRACE=1` prints every
+resolved aggregate barrage (`[combat]`, with weapons and shots), every capture (`[capture]`, with the
+capturing unit and its orders) and every battalion order change (`[orders]`) to stderr.
+`FF_TRACE_UNIT=<creator:num>` prints that ground unit's target candidates in search order with their
+grid keys (`[target]`). `FF_RANDOM_TRACE=1` prints every campaign `rand()` call site. The parent
+workspace's new campaign core prints the same lines (`WARGAME_TRACE`), for step-by-step diffs.
+`export-map` and `export-checkpoint` record each unit's and objective's position in the legacy
+collections (`order`: VU lists and proximity grids).
+
 ## Profiling
 
 Set `FF_HEADLESS_PROFILE=<file.json>` (an absolute path; the host changes into the data

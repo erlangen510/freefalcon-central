@@ -1216,6 +1216,18 @@ void BattalionClass::SetUnitOrders(int neworders, VU_ID oid)
     if (neworders == GetOrders() and oid == GetUnitObjectiveID())
         return;
 
+#ifdef FF_HEADLESS
+    // FF_COMBAT_TRACE=1: one stderr line per battalion order change (headless diagnostics).
+    static const bool traceOrders = getenv("FF_COMBAT_TRACE") != nullptr;
+    if (traceOrders)
+    {
+        GridIndex ux, uy;
+        GetLocation(&ux, &uy);
+        fprintf(stderr, "[orders] %lu %lu:%lu(%d,%d) %d -> %d %lu:%lu\n", TheCampaign.CurrentTime, Id().creator_, Id().num_, ux, uy,
+                GetOrders(), neworders, oid.creator_, oid.num_);
+    }
+#endif
+
     /* if (Cargo() or cargo_id not_eq FalconNullId)
      {
     // KCK: We're in mid-transport, or waiting for pickup what o-what to do?

@@ -30,6 +30,7 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <map>
 #include <set>
 
 extern int VisualDetectionRange[OtherDam];
@@ -346,6 +347,24 @@ void WriteCoreExport(const std::filesystem::path& directory) {
     for (int e = 0; CampEvents && e < CE_Events; ++e) out << (e ? "," : "") << (CampEvents[e] ? CampEvents[e]->flags : 0);
     out << ']';
 
+    // Legacy iteration orders: position of each entity in its VU lists (push-front lists, newest
+    // first) and in the proximity grids (rows, then columns, then insertion order), or -1.
+    auto listOrder = [](auto* list) {
+        std::map<VU_ID, int> order;
+        if (!list) return order;
+        VuListIterator it(list);
+        for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) order.emplace(e->Id(), static_cast<int>(order.size()));
+        return order;
+    };
+    auto gridOrder = [](VuGridTree* grid) {
+        std::map<VU_ID, int> order;
+        if (!grid) return order;
+        VuGridIterator it(grid, 0.0F, 0.0F, 1.0e12F);
+        for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) order.emplace(e->Id(), static_cast<int>(order.size()));
+        return order;
+    };
+    auto at = [](const std::map<VU_ID, int>& order, VU_ID id) { const auto it = order.find(id); return it == order.end() ? -1 : it->second; };
+    const auto objectiveList = listOrder(AllObjList), objectiveGrid = gridOrder(ObjProxList);
     out << ",\"objectives\":[";
     comma = false;
     {
@@ -367,7 +386,7 @@ void WriteCoreExport(const std::filesystem::path& directory) {
                 array(out, o->link_data[n].costs, MOVEMENT_TYPES);
                 out << '}';
             }
-            out << ']';
+            out << "],\"order\":[" << at(objectiveList, o->Id()) << ',' << at(objectiveGrid, o->Id()) << ']';
             if (o->IsPrimary()) {
                 if (POData pd = GetPOData(o)) {
                     out << ",\"po\":{\"flags\":" << int(pd->flags) << ",\"ground_priority\":";
@@ -393,6 +412,8 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         return ids;
     };
     const auto real = listed(AllRealList), parents = listed(AllParentList), inactive = listed(InactiveList);
+    const auto unitList = listOrder(AllUnitList), realList = listOrder(AllRealList), parentList = listOrder(AllParentList),
+               inactiveList = listOrder(InactiveList), unitGrid = gridOrder(RealUnitProxList);
     std::set<VU_ID> written;
     auto emit = [&](Unit u) {
         if (!written.insert(u->Id()).second) return;
@@ -400,7 +421,8 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         unit(out, u);
         out.seekp(-1, std::ios_base::cur);
         out << ",\"lists\":[" << (real.count(u->Id()) ? 1 : 0) << ',' << (parents.count(u->Id()) ? 1 : 0) << ','
-            << (inactive.count(u->Id()) ? 1 : 0) << "]}";
+            << (inactive.count(u->Id()) ? 1 : 0) << "],\"order\":[" << at(unitList, u->Id()) << ',' << at(realList, u->Id()) << ','
+            << at(parentList, u->Id()) << ',' << at(inactiveList, u->Id()) << ',' << at(unitGrid, u->Id()) << "]}";
         comma = true;
     };
     { VuListIterator it(AllUnitList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) emit(static_cast<Unit>(e)); }

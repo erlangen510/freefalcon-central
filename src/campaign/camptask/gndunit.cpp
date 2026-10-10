@@ -359,6 +359,20 @@ int GroundUnitClass::ChooseTarget(void)
         {
             combat = 0;
             react = DetectVs(e, &d, &combat, &spot, &capture, &nomove, &estr);
+#ifdef FF_HEADLESS
+            // FF_TRACE_UNIT=<creator:num>: the unit's target candidates (headless diagnostics).
+            {
+                static const char* traced = getenv("FF_TRACE_UNIT");
+                char self[32];
+                sprintf(self, "%lu:%lu", Id().creator_, Id().num_);
+                if (traced and strcmp(traced, self) == 0)
+                    fprintf(stderr, "[target] %lu %s(%d,%d) sees %lu:%lu(%d,%d) d %.2f react %d combat %d spotted %d/%d key %u/%u\n",
+                            TheCampaign.CurrentTime, self, (int)XPos() / 3280, (int)YPos() / 3280, e->Id().creator_, e->Id().num_,
+                            (int)e->XPos() / 3280, (int)e->YPos() / 3280, d, react, combat,
+                            e->GetSpotted(GetTeam()) ? 1 : 0, GetSpotted(e->GetTeam()) ? 1 : 0,
+                            (unsigned)RealUnitProxFilter->Key1(e), (unsigned)RealUnitProxFilter->Key2(e));
+            }
+#endif
 
             if (not e->IsFlight() and react >= best_reaction and
                 d < react_distance)
