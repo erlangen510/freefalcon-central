@@ -33,6 +33,8 @@
 #include "atcbrain.h"
 #include "radardata.h"
 #include "playerop.h"
+#include "missile.h"
+#include "missdata.h"
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -65,12 +67,17 @@ extern int g_nFlightVisualBonus;
 extern PilotInfoClass* PilotInfo;
 extern RadarDataSet* radarDatFileTable;
 extern short NumRadarDatFileTable;
+extern RadarDataType* RadarDataTable;
+extern short NumRadarEntries;
 extern int NumPilots;
 extern bool g_bEnableABRelocation;
 extern bool g_bScramble;
 extern int g_nAirbaseReloc;
 extern int g_nRelocationWait;
 extern float g_fIdentFactor;
+extern bool g_bAWACSRequired;
+extern bool g_bRP5Comp;
+extern bool g_bLimit2DRadarFight;
 extern int ALT_TO_BUILD_RANGES_TO;
 extern int g_nNoPlayerPlay;
 
@@ -462,7 +469,14 @@ void WriteCoreExport(const std::filesystem::path& directory) {
             << ",\"rack_flags\":" << v->RackFlags << ",\"callsign\":[" << int(v->CallsignIndex) << ',' << int(v->CallsignSlots) << ']'
             << ",\"radar\":[" << v->RadarType << ','
             << (radarDatFileTable && v->RadarType >= 0 && v->RadarType < NumRadarDatFileTable ? radarDatFileTable[v->RadarType].Maxmissilesintheair : -1)
-            << "],\"hit_chance\":";
+            << ',';
+        {
+            char angle[32];
+            std::snprintf(angle, sizeof angle, "%.9g",
+                          RadarDataTable && v->RadarType >= 0 && v->RadarType < NumRadarEntries ? RadarDataTable[v->RadarType].ScanHalfAngle : 0.0f);
+            out << angle;
+        }
+        out << "],\"hit_chance\":";
         array(out, v->HitChance, MOVEMENT_TYPES);
         out << ",\"strength\":"; array(out, v->Strength, MOVEMENT_TYPES);
         out << ",\"range\":"; array(out, v->Range, MOVEMENT_TYPES);
@@ -484,6 +498,24 @@ void WriteCoreExport(const std::filesystem::path& directory) {
             << ",\"rariety\":" << int(w->Rariety) << ",\"guidance_flags\":" << w->GuidanceFlags << ",\"collective\":" << int(w->Collective)
             << ",\"blast_radius\":" << w->BlastRadius << ",\"max_alt\":" << int(w->MaxAlt) << ",\"hit_chance\":";
         array(out, w->HitChance, MOVEMENT_TYPES);
+        {
+            // UnitClass::GetVehicleRange with g_bLimit2DRadarFight: surface-to-air missiles with missile
+            // data are limited to their engagement envelope (min altitude, min range, max altitude, feet).
+            const VU_BYTE* ci = Falcon4ClassTable[w->Index].vuClassData.classInfo_;
+            if (ci[VU_DOMAIN] == DOMAIN_AIR && ci[VU_CLASS] == CLASS_VEHICLE && ci[VU_TYPE] == TYPE_MISSILE &&
+                ci[VU_STYPE] == STYPE_MISSILE_SURF_AIR && SimWeaponDataTable) {
+                const SimWeaponDataType* def = &SimWeaponDataTable[Falcon4ClassTable[w->Index].vehicleDataIndex];
+                const MissileAuxData* aux = def->dataIdx < numMissileDatasets ? missileDataset[def->dataIdx].auxData : nullptr;
+                if (aux) {
+                    float minAlt = aux->MinEngagementAlt;
+                    if (minAlt < 0.0f) minAlt = static_cast<float>(w->Name[18]) * 32.0F;
+                    char limits[96];
+                    std::snprintf(limits, sizeof limits, "[%.9g,%.9g,%.9g]", minAlt, aux->MinEngagementRange,
+                                  static_cast<float>(w->MaxAlt) * 1000.0f);
+                    out << ",\"sam_envelope\":" << limits;
+                }
+            }
+        }
         out << '}';
     }
     out << "},\"objective_classes\":{"; comma = false;
@@ -584,7 +616,9 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         << ",\"realistic_attrition\":" << int(g_bRealisticAttrition) << ",\"loadout_squad_store_resupply\":" << int(g_bLoadoutSquadStoreResupply)
         << ",\"flight_visual_bonus\":" << g_nFlightVisualBonus << ",\"ident_factor\":" << g_fIdentFactor
         << ",\"enable_ab_relocation\":" << int(g_bEnableABRelocation) << ",\"scramble\":" << int(g_bScramble)
-        << ",\"airbase_reloc\":" << g_nAirbaseReloc << ",\"relocation_wait\":" << g_nRelocationWait << '}';
+        << ",\"airbase_reloc\":" << g_nAirbaseReloc << ",\"relocation_wait\":" << g_nRelocationWait
+        << ",\"awacs_required\":" << int(g_bAWACSRequired) << ",\"rp5_comp\":" << int(g_bRP5Comp)
+        << ",\"limit_2d_radar_fight\":" << int(g_bLimit2DRadarFight) << '}';
     // The pilot name pool (PilotInfo usage counts) and each team's pilot id ranges, for replacement pilots.
     out << ",\"pilot_pool\":{\"usage\":[";
     for (int i = 0; PilotInfo && i < NumPilots; ++i) out << (i ? "," : "") << PilotInfo[i].usage;
@@ -810,7 +844,14 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         out << ",\"lists\":[" << (real.count(u->Id()) ? 1 : 0) << ',' << (parents.count(u->Id()) ? 1 : 0) << ','
             << (inactive.count(u->Id()) ? 1 : 0) << "],\"order\":[" << at(unitList, u->Id()) << ',' << at(realList, u->Id()) << ','
             << at(parentList, u->Id()) << ',' << at(inactiveList, u->Id()) << ',' << at(unitGrid, u->Id()) << ',' << at(campList, u->Id()) << ',' << at(airList, u->Id())
-            << "],\"radar\":[" << u->GetRadarMode() << ',' << (u->IsBattalion() ? static_cast<BattalionClass*>(u)->GetSearchMode() : 0) << "]}";
+            << "],\"radar\":[" << u->GetRadarMode() << ',' << (u->IsBattalion() ? static_cast<BattalionClass*>(u)->GetSearchMode() : 0) << ']';
+        {
+            char yaw[32];
+            std::snprintf(yaw, sizeof yaw, "%.9g", u->Yaw());
+            out << ",\"yaw\":" << yaw;
+            std::snprintf(yaw, sizeof yaw, "%.9g", u->ZPos());
+            out << ",\"z\":" << yaw << '}';
+        }
         comma = true;
     };
     { VuListIterator it(AllUnitList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) emit(static_cast<Unit>(e)); }

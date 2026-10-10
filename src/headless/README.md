@@ -153,15 +153,17 @@ objective's native record inside and outside the region. Used by the parent work
 ## Diagnostics
 
 Headless builds only; each reads state and changes nothing. `FF_COMBAT_TRACE=1` prints every
-resolved aggregate barrage (`[combat]`, with weapons and shots), every capture (`[capture]`, with the
+resolved aggregate barrage (`[combat]`, with weapons, shots, final hit chance and hits), every damage
+application to a unit (`[damage]`: vehicles, strength, tries, vehicles found, losses), every capture (`[capture]`, with the
 capturing unit and its orders) and every battalion order change (`[orders]`) to stderr.
 `FF_TRACE_UNIT=<creator:num>` prints that ground unit's target candidates in search order with their
 grid keys (`[target]`). `FF_AIR_TRACE=1` prints every posted mission request (`[request]`) and every
-request the ATM queues (`[accepted]`). `FF_RANDOM_TRACE=1` prints every campaign `rand()` call site. The parent
+request the ATM queues (`[accepted]`), every package built (`[package]`) and request handled (`[task]`). `FF_RANDOM_TRACE=1` prints every campaign `rand()` call site. The parent
 workspace's new campaign core prints the same lines (`WARGAME_TRACE`), for step-by-step diffs.
 `export-map` and `export-checkpoint` record each unit's and objective's position in the legacy
 collections (`order`: VU lists and proximity grids), and the air war's state: mission and priority
-tables, squadron stores and records, team air actions and ATM records, and all Falcon4.AII inputs.
+tables, squadron stores and records, team air actions and ATM records, vehicle radar data, SAM
+engagement envelopes, unit yaw and altitude, and all Falcon4.AII inputs.
 
 ## Profiling
 

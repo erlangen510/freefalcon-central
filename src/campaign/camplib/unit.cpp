@@ -632,6 +632,10 @@ int UnitClass::ApplyDamage(FalconCampWeaponsFire* cwfm, uchar bonusToHit)
 
     ShiAssert(IsAggregate());
 
+#ifdef FF_HEADLESS
+    int traceHitChance[MAX_TYPES_PER_CAMP_FIRE_MESSAGE] = {};
+    int traceHits[MAX_TYPES_PER_CAMP_FIRE_MESSAGE] = {};
+#endif
     gDamageStatusPtr = gDamageStatusBuffer + 1;
     gDamageStatusBuffer[0] = 0;
     shooter->GetLocation(&sx, &sy);
@@ -714,6 +718,9 @@ int UnitClass::ApplyDamage(FalconCampWeaponsFire* cwfm, uchar bonusToHit)
 
         if (hc < 1)
             hc = 1; // Minimum chance to hit of 1%
+#ifdef FF_HEADLESS
+        traceHitChance[i] = hc;
+#endif
 
         // Tally the losses
         strength = GetWeaponStrength(cwfm->dataBlock.weapon[i]);
@@ -733,6 +740,9 @@ int UnitClass::ApplyDamage(FalconCampWeaponsFire* cwfm, uchar bonusToHit)
 
             if (rand() % 100 < hc)
             {
+#ifdef FF_HEADLESS
+                ++traceHits[i];
+#endif
                 str += strength;
                 currentLosses +=
                     ApplyDamage(dt, &str, cwfm->dataBlock.dPilotId, flags);
@@ -757,7 +767,7 @@ int UnitClass::ApplyDamage(FalconCampWeaponsFire* cwfm, uchar bonusToHit)
                 range, totalShots, currentLosses);
     if (traceCombat)
         for (int w = 0; w < MAX_TYPES_PER_CAMP_FIRE_MESSAGE and cwfm->dataBlock.weapon[w]; ++w)
-            fprintf(stderr, "[combat]   weapon %d shots %d\n", cwfm->dataBlock.weapon[w], cwfm->dataBlock.shots[w]);
+            fprintf(stderr, "[combat]   weapon %d shots %d hc %d hits %d\n", cwfm->dataBlock.weapon[w], cwfm->dataBlock.shots[w], traceHitChance[w], traceHits[w]);
 #endif
     // Check morale
     MoraleCheck(totalShots, currentLosses);
@@ -872,6 +882,10 @@ int UnitClass::ApplyDamage(DamType d, int* str, int where, short flags)
 
     // Start the pounding
     vehs = GetTotalVehicles();
+#ifdef FF_HEADLESS
+    const int traceVehs = vehs, traceStr = *str;
+    int traceFinds = 0;
+#endif
 
     while (*str > 0 and vehs and count < MAX_DAMAGE_TRIES)
     {
@@ -890,6 +904,9 @@ int UnitClass::ApplyDamage(DamType d, int* str, int where, short flags)
         if (n > 0 and uc->VehicleType[v])
         {
             vc = GetVehicleClassData(uc->VehicleType[v]);
+#ifdef FF_HEADLESS
+            ++traceFinds;
+#endif
 
             if (vc->DamageMod[d])
             {
@@ -971,6 +988,13 @@ int UnitClass::ApplyDamage(DamType d, int* str, int where, short flags)
         count++;
     }
 
+#ifdef FF_HEADLESS
+    {
+        static const bool traceDamage = getenv("FF_COMBAT_TRACE") != nullptr;
+        if (traceDamage)
+            fprintf(stderr, "[damage] %lu:%lu vehs %d str %d tries %d finds %d lost %d left %d\n", Id().creator_, Id().num_, traceVehs, traceStr, count, traceFinds, lost, vehs);
+    }
+#endif
     // Check for death
     if (not vehs and not IsDead())
     {
