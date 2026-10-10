@@ -29,12 +29,15 @@
 #include "campwp.h"
 #include "scenario.h"
 #include "falcsess.h"
+#include "weaplist.h"
 #include "playerop.h"
 #include <fstream>
 #include <sstream>
 #include <filesystem>
 #include <map>
 #include <set>
+#include <vector>
+#include <cstdio>
 
 extern int VisualDetectionRange[OtherDam];
 extern uchar RoEData[ROE_NAVAL_BOMBARD + 1][War + 1];
@@ -44,6 +47,21 @@ extern EventClass** CampEvents;
 extern short CE_Events;
 extern SquadronStoresDataType* SquadronStoresDataTable;
 extern bool g_bPowerGrid;
+extern int g_npercentage_available_aircraft;
+extern int g_nminimum_available_aircraft;
+extern float g_fClimbRatio;
+extern int g_nNoWPRefuelNeeded;
+extern bool g_bAddIngressWP;
+extern bool g_bTankerWaypoints;
+extern bool g_bLargeStrike;
+extern bool g_bOldSamActivity;
+extern bool g_bPrecisionWaypoints;
+extern bool g_bFireOntheMove;
+extern bool g_bRealisticAttrition;
+extern bool g_bLoadoutSquadStoreResupply;
+extern int g_nFlightVisualBonus;
+extern float g_fIdentFactor;
+extern int ALT_TO_BUILD_RANGES_TO;
 extern int g_nNoPlayerPlay;
 
 extern short NumSquadTypes;
@@ -354,6 +372,7 @@ void unit(std::ostream& out, Unit u) {
             << ",\"last_resupply\":" << s->GetLastResupplyTime() << ",\"airbase\":" << quoted(s->GetUnitAirbaseID());
         // The whole squadron record (SquadronClass): stores as [weapon, count] pairs, pilots, schedule.
         out << ",\"squadron\":{\"fuel\":" << s->GetSquadronFuel() << ",\"specialty\":" << s->GetUnitSpecialty()
+            << ",\"player_type\":" << TheCampaign.IsValidAircraftType(u)
             << ",\"hot_spot\":" << quoted(s->GetHotSpot()) << ",\"aa_kills\":" << s->GetAAKills() << ",\"ag_kills\":" << s->GetAGKills()
             << ",\"as_kills\":" << s->GetASKills() << ",\"an_kills\":" << s->GetANKills() << ",\"missions_flown\":" << s->GetMissionsFlown()
             << ",\"mission_score\":" << s->GetMissionScore() << ",\"total_losses\":" << int(s->GetTotalLosses())
@@ -428,7 +447,10 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         out << (comma ? "," : "") << '"' << i << "\":{"; comma = true;
         classInfo(out, i);
         out << ",\"name\":" << name(v->Name, sizeof v->Name) << ",\"hit_points\":" << v->HitPoints << ",\"flags\":" << v->Flags
-            << ",\"max_speed\":" << v->MaxSpeed << ",\"hit_chance\":";
+            << ",\"max_speed\":" << v->MaxSpeed << ",\"high_alt\":" << v->HighAlt << ",\"low_alt\":" << v->LowAlt
+            << ",\"cruise_alt\":" << v->CruiseAlt << ",\"fuel_econ\":" << v->FuelEcon << ",\"visible_flags\":" << v->VisibleFlags
+            << ",\"rack_flags\":" << v->RackFlags << ",\"callsign\":[" << int(v->CallsignIndex) << ',' << int(v->CallsignSlots) << ']'
+            << ",\"hit_chance\":";
         array(out, v->HitChance, MOVEMENT_TYPES);
         out << ",\"strength\":"; array(out, v->Strength, MOVEMENT_TYPES);
         out << ",\"range\":"; array(out, v->Range, MOVEMENT_TYPES);
@@ -537,6 +559,62 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         out << "]}";
     }
     out << ']';
+
+    // Flight planning inputs: the runtime configuration switches the planner reads, the weapon lists
+    // vehicle hardpoints load from (each up to its first empty entry), and the terrain MEA table as
+    // TheMap.Setup reads it (Theater.map header, Theater.MEA rows stored bottom up).
+    out << ",\"air_planning\":{\"config\":{\"percentage_available_aircraft\":" << g_npercentage_available_aircraft
+        << ",\"minimum_available_aircraft\":" << g_nminimum_available_aircraft << ",\"climb_ratio\":" << g_fClimbRatio
+        << ",\"no_wp_refuel_needed\":" << g_nNoWPRefuelNeeded << ",\"add_ingress_wp\":" << int(g_bAddIngressWP)
+        << ",\"tanker_waypoints\":" << int(g_bTankerWaypoints) << ",\"large_strike\":" << int(g_bLargeStrike)
+        << ",\"old_sam_activity\":" << int(g_bOldSamActivity) << ",\"precision_waypoints\":" << int(g_bPrecisionWaypoints)
+        << ",\"fire_on_the_move\":" << int(g_bFireOntheMove) << ",\"alt_to_build_ranges_to\":" << ALT_TO_BUILD_RANGES_TO
+        << ",\"realistic_attrition\":" << int(g_bRealisticAttrition) << ",\"loadout_squad_store_resupply\":" << int(g_bLoadoutSquadStoreResupply)
+        << ",\"flight_visual_bonus\":" << g_nFlightVisualBonus << ",\"ident_factor\":" << g_fIdentFactor << '}';
+    out << ",\"valid_aircraft_types\":{\"count\":" << TheCampaign.NumberOfValidTypes << ",\"types\":[";
+    for (int i = 0; TheCampaign.ValidAircraftTypes && i < TheCampaign.NumberOfValidTypes && TheCampaign.NumberOfValidTypes < 8888; ++i)
+        out << (i ? "," : "") << TheCampaign.ValidAircraftTypes[i];
+    out << "]},\"weapon_lists\":{";
+    {
+        std::set<int> lists;
+        for (int i = 0; i < NumEntities; ++i) {
+            if (Falcon4ClassTable[i].dataType != DTYPE_VEHICLE || !Falcon4ClassTable[i].dataPtr) continue;
+            auto* v = GetVehicleClassData(i);
+            for (int hp = 0; hp < HARDPOINT_MAX; ++hp)
+                if (v->Weapons[hp] == 255) lists.insert(v->Weapon[hp]);
+        }
+        bool first = true;
+        for (int l : lists) {
+            out << (first ? "" : ",") << '"' << l << "\":[";
+            first = false;
+            for (int e = 0; e < MAX_WEAPONS_IN_LIST; ++e) {
+                out << (e ? "," : "") << '[' << GetListEntryWeapon(l, e) << ',' << GetListEntryWeapons(l, e) << ']';
+                if (!GetListEntryWeapon(l, e)) break;
+            }
+            out << ']';
+        }
+    }
+    out << "},\"mea\":";
+    {
+        std::ifstream header("terrdata/korea/terrain/Theater.map", std::ios::binary);
+        float feetPerPost = 0, ftToCell = 0;
+        int width = 0, height = 0;
+        header.read(reinterpret_cast<char*>(&feetPerPost), sizeof feetPerPost);
+        header.read(reinterpret_cast<char*>(&width), sizeof width);
+        header.read(reinterpret_cast<char*>(&height), sizeof height);
+        header.read(reinterpret_cast<char*>(&ftToCell), sizeof ftToCell);
+        std::ifstream data("terrdata/korea/terrain/Theater.MEA", std::ios::binary);
+        std::vector<short> values(static_cast<size_t>(width) * height);
+        for (int row = height - 1; row >= 0 && header; --row)
+            data.read(reinterpret_cast<char*>(&values[static_cast<size_t>(row) * width]), width * sizeof(short));
+        if (!header || !data) throw std::runtime_error("terrain MEA table unreadable for the core export");
+        char factor[32];
+        std::snprintf(factor, sizeof factor, "%.9g", ftToCell);
+        out << "{\"width\":" << width << ",\"height\":" << height << ",\"ft_to_cell\":" << factor << ",\"values\":[";
+        for (size_t i = 0; i < values.size(); ++i) out << (i ? "," : "") << values[i];
+        out << "]}";
+    }
+    out << '}';
 
     out << ",\"teams\":[";
     for (int t = 0; t < NUM_TEAMS; ++t) {
@@ -651,6 +729,12 @@ void WriteCoreExport(const std::filesystem::path& directory) {
             }
             out << "],\"order\":[" << at(objectiveList, o->Id()) << ',' << at(objectiveGrid, o->Id()) << ',' << at(campList, o->Id())
                 << "],\"emitting\":" << (o->IsEmitting() ? 1 : 0);
+            // Terrain radar arcs (CampaignRadarClass), for the radar coverage map: count, then ratios.
+            if (o->HasRadarRanges()) {
+                out << ",\"radar_arcs\":[" << o->GetNumberOfArcs();
+                for (int a = 0; a < 8; ++a) { char r[32]; std::snprintf(r, sizeof r, "%.9g", o->GetArcRatio(a)); out << ',' << r; }
+                out << ']';
+            }
             if (o->IsPrimary()) {
                 if (POData pd = GetPOData(o)) {
                     out << ",\"po\":{\"flags\":" << int(pd->flags) << ",\"ground_priority\":";

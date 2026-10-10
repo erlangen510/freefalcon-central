@@ -606,6 +606,12 @@ int AirTaskingManagerClass::Task(void)
 
         // RV - Biker - Limit strenght for give mission
         mis->aircraft = min(mis->aircraft, MissionData[mis->mission].str);
+#ifdef FF_HEADLESS
+        static const bool traceTask = getenv("FF_AIR_TRACE") != nullptr;
+        if (traceTask)
+            fprintf(stderr, "[task] %lu team %d mission %d at %d,%d result %d\n", TheCampaign.CurrentTime, (int)owner, (int)mis->mission,
+                    mis->tx, mis->ty, res);
+#endif
 
 #ifdef DEBUG_TIMING
         MonoPrint("Team %d %s Pack @ %d,%d: %d ticks (%s)\n", owner,
@@ -633,6 +639,22 @@ int AirTaskingManagerClass::Task(void)
             if (pc and not(mis->flags bitand AMIS_IMMEDIATE))
             {
                 packageList->ForcedInsert(pc);
+#ifdef FF_HEADLESS
+                // FF_AIR_TRACE=1: one stderr line per package built (headless diagnostics; reads state only).
+                static const bool tracePackage = getenv("FF_AIR_TRACE") != nullptr;
+                if (tracePackage)
+                {
+                    int aircraft = 0;
+                    for (Unit e = pc->GetFirstUnitElement(); e; e = pc->GetNextUnitElement())
+                        aircraft += e->GetTotalVehicles();
+                    GridIndex px, py;
+                    pc->GetUnitDestination(&px, &py);
+                    fprintf(stderr, "[package] %lu team %d %lu:%lu mission %d at %d,%d flights %d aircraft %d takeoff %lu tot %lu"
+                            "\n", TheCampaign.CurrentTime, (int)owner, pc->Id().creator_, pc->Id().num_,
+                            (int)pc->GetMissionRequest()->mission, px, py, (int)pc->GetFlights(), aircraft, pc->GetTakeoff(),
+                            pc->GetMissionRequest()->tot);
+                }
+#endif
                 pc = NULL;
             }
 
