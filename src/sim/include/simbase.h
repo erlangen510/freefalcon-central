@@ -363,6 +363,14 @@ public:
     {
         return strength;
     };
+#ifdef FF_DETAILED_ENGINE
+    void RestoreRemainingStrength(float remaining) {
+        if(remaining>=0 && remaining<strength) {
+            strength=remaining;
+            pctStrength=maxStrength>0?strength/maxStrength:0;
+        }
+    }
+#endif
     float MaxStrength(void)
     {
         return maxStrength;

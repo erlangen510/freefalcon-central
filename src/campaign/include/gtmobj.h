@@ -25,6 +25,11 @@ struct PrimaryObjectiveData
     short player_priority
         [NUM_TEAMS]; // Player adjusted priorities (or ATM's if no modifications)
     uchar flags;
+#ifdef FF_HEADLESS
+    // Observer commander override (-1 = none). Like #SET_PRIORITY, but per team,
+    // so it does not freeze the other teams' calculated priorities.
+    short operator_priority[NUM_TEAMS];
+#endif
 };
 typedef PrimaryObjectiveData* POData;
 

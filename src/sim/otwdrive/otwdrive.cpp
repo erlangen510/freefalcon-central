@@ -2123,8 +2123,10 @@ void OTWDriverClass::Enter(void)
     // Work out a decent name for us.
     Vis_Types eCPVisType = (Vis_Types)MapVisId(VIS_F16C);
     // ---------**********-----------***********-----------**********-----
-    TCHAR* eCPName = NULL;
-    TCHAR* eCPNameNCTR = NULL;
+    // With no player flight, cockpit lookup must receive valid empty names.
+    TCHAR emptyCockpitName[] = "";
+    TCHAR* eCPName = emptyCockpitName;
+    TCHAR* eCPNameNCTR = emptyCockpitName;
 
     FlightClass* pFlight = FalconLocalSession->GetPlayerFlight();
 

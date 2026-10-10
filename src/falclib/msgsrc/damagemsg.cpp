@@ -64,6 +64,14 @@ int FalconDamageMessage::Process(uchar autodisp)
                     " type="+std::to_string(dataBlock.damageType)+" input="+std::to_string(dataBlock.damageStrength)+
                     " random="+std::to_string(dataBlock.damageRandomFact)+" before="+std::to_string(strengthBefore));
             shooter = static_cast<FalconEntity*>(vuDatabase->Find(dataBlock.fEntityID));
+            ff_headless::CombatEvent event;
+            event.damage=true; event.time=SimLibElapsedTime;
+            event.shooterCreator=dataBlock.fEntityID.creator_; event.shooterNumber=dataBlock.fEntityID.num_;
+            event.targetCreator=dataBlock.dEntityID.creator_; event.targetNumber=dataBlock.dEntityID.num_;
+            event.weaponCreator=dataBlock.fWeaponUID.creator_; event.weaponNumber=dataBlock.fWeaponUID.num_;
+            event.weaponType=dataBlock.fWeaponID;
+            event.before=strengthBefore; event.after=static_cast<SimBaseClass*>(theEntity)->Strength();
+            ff_headless::combat.record(event);
             if(ff_headless::combat.trackProjectileEnds && theEntity->IsHelicopter() && static_cast<SimBaseClass*>(theEntity)->Strength()<strengthBefore)
                 fprintf(stderr,"[helo-damage-received] victim=%lu shooter=%lu projectile=%lu strength=%.2f->%.2f\n",theEntity->Id().num_,dataBlock.fEntityID.num_,dataBlock.fWeaponUID.num_,strengthBefore,static_cast<SimBaseClass*>(theEntity)->Strength());
             if(ff_headless::combat.trackProjectileEnds && static_cast<SimBaseClass*>(theEntity)->Strength()<strengthBefore)

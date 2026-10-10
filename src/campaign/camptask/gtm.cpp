@@ -1,3 +1,6 @@
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+#include "headless/detailed.h"
+#endif
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -250,6 +253,15 @@ void GroundTaskingManagerClass::DoCalculations(void)
             // if ( not (pd->flags bitand GTMOBJ_PLAYER_SET_PRIORITY))
             // pd->player_priority[owner] = pd->air_priority[owner];
         }
+
+#ifdef FF_HEADLESS
+        if (pd->operator_priority[owner] >= 0)
+        {
+            score = pd->operator_priority[owner];
+            pd->ground_priority[owner] = score;
+            pd->air_priority[owner] = score;
+        }
+#endif
 
         if (not GetRoE(owner, t, ROE_GROUND_CAPTURE) and owner not_eq t)
             pd->ground_priority[owner] = 0;
@@ -875,7 +887,11 @@ int GroundTaskingManagerClass::CollectGroundAssets(int to_collect)
     while (u)
     {
         if (u->GetTeam() == owner and u->GetDomain() == DOMAIN_LAND and
-            not u->Scripted())
+            not u->Scripted()
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+            && !HasDetailedGroundOrder(u->Id().creator_,u->Id().num_)
+#endif
+            )
         {
             // We've got at least one unit to assign - build our objective lists
             if (not objListBuilt)
@@ -923,6 +939,13 @@ int GroundTaskingManagerClass::AssignUnit(Unit u, int orders, Objective o,
 
     if (not u or not o)
         return 0;
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+    // A candidate list may predate the operator command.
+    if(HasDetailedGroundOrder(u->Id().creator_,u->Id().num_)) {
+        u->SetAssigned(1);
+        return 1;
+    }
+#endif
 
 #ifdef KEV_GDEBUG
     AssignedCount[orders]++;

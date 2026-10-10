@@ -49,6 +49,9 @@
 #include "atcbrain.h"
 #include "dirtybits.h"
 #include "aircrft.h"
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+#include "digi.h"
+#endif
 #include "campmap.h"
 #include "gndai.h"
 #include "campstr.h"
@@ -5207,6 +5210,12 @@ void RegroupAircraft(AircraftClass *ac)
 
     flight = (Flight)ac->GetCampaignObject();
 
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+    const int recoverySlot=flight->GetAdjustedPlayerSlot(ac->pilotSlot);
+    const int recoveryPilot=(recoverySlot>=0 && recoverySlot<PILOTS_PER_FLIGHT)?flight->pilots[recoverySlot]:NO_PILOT;
+    const bool alreadyRemoved=ac->IsSetRemoveFlag();
+#endif
+
     // find last hardpoint
 
     // Set this vehicle as "Return To Base" so that record current state will not chalk
@@ -5237,6 +5246,20 @@ void RegroupAircraft(AircraftClass *ac)
 
     // Now update the flight's status
     flight->RecordCurrentState(NULL, FALSE);
+
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+    auto* recoverySquad=(Squadron)flight->GetUnitSquadron();
+    if(!alreadyRemoved && recoveryPilot!=NO_PILOT && recoverySquad && ac->IsSetRemoveFlag() &&
+       flight->pilots[recoverySlot]==NO_PILOT && recoverySquad->GetPilotStatus(recoveryPilot)==PILOT_AVAILABLE &&
+       (flight->plane_stats[recoverySlot]==AIRCRAFT_RTB || flight->plane_stats[recoverySlot]==AIRCRAFT_NOT_ASSIGNED)) {
+        ff_headless::CombatCounters::RecoveryEvent event;
+        event.time=TheCampaign.CurrentTime;
+        event.actorCreator=ac->Id().creator_;event.actorNumber=ac->Id().num_;
+        event.flightCreator=flight->Id().creator_;event.flightNumber=flight->Id().num_;
+        event.slot=recoverySlot;event.onGround=ac->OnGround();event.atc=ac->DBrain()?int(ac->DBrain()->ATCStatus()):0;
+        ff_headless::combat.recordRecovery(event);
+    }
+#endif
 
 #endif
 }

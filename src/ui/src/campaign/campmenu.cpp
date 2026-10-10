@@ -1836,9 +1836,51 @@ void SetMapSettings()
     }
 }
 
+
+#include "include/native_observer.h"
+#ifdef FF_NATIVE_OBSERVER
+static void MenuObserveCB(long,short,C_Base*)
+{
+    C_Base* caller=gPopupMgr->GetCallingControl();
+    gPopupMgr->CloseMenu();
+    if(!caller || !gMapMgr || !gGps) return;
+    float x=0,y=0;
+    UI_Refresher* record=NULL;
+    if(caller->_GetCType_()==_CNTL_MAP_MOVER_) {
+        short rx=short(((C_MapMover*)caller)->GetRelX()+caller->GetX()+caller->Parent_->GetX());
+        short ry=short(((C_MapMover*)caller)->GetRelY()+caller->GetY()+caller->Parent_->GetY());
+        gMapMgr->GetMapRelativeXY(&rx,&ry);
+        if(gMapMgr->GetMapScale()<=0) return;
+        y=rx/gMapMgr->GetMapScale(); x=gMapMgr->GetMaxY()-ry/gMapMgr->GetMapScale();
+    } else {
+        if(caller->_GetCType_()==_CNTL_MAPICON_)
+            record=(UI_Refresher*)gGps->Find(((C_MapIcon*)caller)->GetIconID());
+        else if(caller->_GetCType_()==_CNTL_DRAWLIST_)
+            record=(UI_Refresher*)gGps->Find(((C_DrawList*)caller)->GetIconID());
+        if(!record) return;
+        CampEntity entity=(CampEntity)vuDatabase->Find(record->GetID());
+        if(!entity) return;
+        x=entity->XPos(); y=entity->YPos();
+    }
+    if(!NativeObserver::Request(x,y))
+        MessageBoxA(NULL,"Observation requires a running local single-player campaign.","Observe battle",MB_OK);
+}
+#endif
+
 void SetupCampaignMenus()
 {
     C_PopupList *menu;
+#ifdef FF_NATIVE_OBSERVER
+    const long observerMenus[]={MAP_POP,UNIT_POP,AIRUNIT_MENU,OBJECTIVE_POP};
+    for(long id:observerMenus) {
+        C_PopupList* observerMenu=gPopupMgr->GetMenu(id);
+        if(observerMenu) {
+            observerMenu->AddItem(565419800,C_TYPE_ITEM,(char*)"Observe battle",0);
+            observerMenu->SetCallback(565419800,MenuObserveCB);
+        }
+    }
+#endif
+
 
     GameType = 1;
     EditMode = 0;

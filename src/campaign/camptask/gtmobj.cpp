@@ -86,6 +86,9 @@ void AddPODataEntry(Objective po)
         pd->player_priority[i] = -1;
         pd->ground_assigned[i] = 0;
         pd->flags = 0;
+#ifdef FF_HEADLESS
+        pd->operator_priority[i] = -1;
+#endif
     }
 
     PODataList->InsertNewElement(po->GetCampID(), pd, 0);

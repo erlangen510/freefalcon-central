@@ -174,6 +174,17 @@ void TranslatePointData(CampEntity e, int ptindex, float *x, float *y)
         // SCR 11/29/98  I don't think objectives HAVE headings, so this is correct.
         *x = e->XPos();
         *y = e->YPos();
+        const ObjectivePointTransform *t = ((Objective)e)->point_transform;
+
+        if (t)
+        {
+            // Site layout: offsets are (east, north); rotate clockwise, then shift.
+            const float east = PtDataTable[ptindex].xOffset, north = PtDataTable[ptindex].yOffset;
+            *x += -east * t->sin + north * t->cos + t->y;
+            *y += east * t->cos + north * t->sin + t->x;
+            return;
+        }
+
         *x += PtDataTable[ptindex].yOffset; // KCK NOTE: axis' are reversed
         *y += PtDataTable[ptindex].xOffset;
     }

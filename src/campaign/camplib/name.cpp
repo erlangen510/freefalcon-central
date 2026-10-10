@@ -27,7 +27,9 @@
 
 //char NameTable[MAX_NAMES][MAX_NAME_LENGTH];
 
-short *NameIndex = NULL;
+// Offsets into the name stream. Unsigned: the stream may exceed 32767 characters (the
+// open-data objective set names about 3000 objectives); the .idx file keeps 16-bit values.
+unsigned short *NameIndex = NULL;
 short NameEntries = 0;
 char NameFile[40];
 
@@ -60,8 +62,8 @@ void LoadNames(char *filename)
         delete NameIndex;
     }
 
-    NameIndex = new short[NameEntries];
-    memcpychk(NameIndex, &data_ptr, sizeof(short) * NameEntries, &rem);
+    NameIndex = new unsigned short[NameEntries];
+    memcpychk(NameIndex, &data_ptr, sizeof(unsigned short) * NameEntries, &rem);
 
     delete cd.data;
 }
@@ -123,6 +125,49 @@ int SaveNames(char *filename)
     fprintf(fp, "-1");
     CloseCampFile(fp);
 
+    return 1;
+}
+
+// Replaces the whole table: entries 0 and 1 keep their text, names[i] becomes entry i + 2.
+// Returns 0 when the stream would not fit 16-bit offsets.
+int ReplaceNameTable(int count, const _TCHAR *const *names)
+{
+    _TCHAR keep[2][128];
+    size_t total = 0;
+
+    for (int i = 0; i < 2; i++)
+    {
+        keep[i][0] = 0;
+        if (NameIndex and NameEntries > i + 1)
+            ReadNameString(i, keep[i], 127);
+        total += _tcslen(keep[i]);
+    }
+
+    for (int i = 0; i < count; i++)
+        total += _tcslen(names[i]);
+
+    if (total > 65535)
+        return 0;
+
+    unsigned short *index = new unsigned short[count + 3];
+    _TCHAR *stream = new _TCHAR[total > 0 ? total : 1];
+    size_t at = 0;
+
+    for (int i = 0; i < count + 2; i++)
+    {
+        const _TCHAR *text = i < 2 ? keep[i] : names[i - 2];
+        size_t len = _tcslen(text);
+        index[i] = (unsigned short)at;
+        memcpy(&stream[at], text, len * sizeof(_TCHAR));
+        at += len;
+    }
+
+    index[count + 2] = (unsigned short)at;
+    delete[] NameIndex;
+    delete[] NameStream;
+    NameIndex = index;
+    NameStream = stream;
+    NameEntries = (short)(count + 3);
     return 1;
 }
 
@@ -207,7 +252,7 @@ int AddName(_TCHAR *name)
     {
         // Found a free spot, insert this string
         if (not NameIndex[nid])
-            NameIndex[nid] = (short)offset;
+            NameIndex[nid] = (unsigned short)offset;
 
         for (i = nid + 1; i < NameEntries; i++)
             NameIndex[i] += len;
@@ -217,12 +262,13 @@ int AddName(_TCHAR *name)
     // Otherwise tack on a new entry
     else
     {
-        short *TmpIdx;
-        nid = NameEntries;
-        // Reallocate our memory
-        TmpIdx = new short[NameEntries + 1];
-        memcpy(TmpIdx, NameIndex, sizeof(short) * NameEntries);
-        TmpIdx[nid + 1] = (short)(TmpIdx[nid] + len);
+        unsigned short *TmpIdx;
+        // The last index is the end of the stream: the new name takes the slot it
+        // starts at, and a new end follows. (The original wrote one past the array.)
+        nid = NameEntries - 1;
+        TmpIdx = new unsigned short[NameEntries + 1];
+        memcpy(TmpIdx, NameIndex, sizeof(unsigned short) * NameEntries);
+        TmpIdx[nid + 1] = (unsigned short)(TmpIdx[nid] + len);
         delete[] NameIndex;
         NameIndex = TmpIdx;
         NameEntries++;

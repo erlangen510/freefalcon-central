@@ -1,4 +1,7 @@
 #include <stdio.h>
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+#include "headless/detailed.h"
+#endif
 #include <conio.h>
 #include <stddef.h>
 #include <fcntl.h>
@@ -779,6 +782,14 @@ int GetNewRole(Unit e, Unit brig)
 // It's up to the elements to determine the method of getting there.
 int BrigadeClass::OrderElement(Unit e, F4PFList nearlist)
 {
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+    // Operator orders own this battalion's objective while it is in the selected region.
+    // Mark assigned so the parent tasking loop can still finish normally.
+    if(HasDetailedGroundOrder(e->Id().creator_,e->Id().num_)) {
+        e->SetAssigned(1);
+        return 1;
+    }
+#endif
     Objective o, bo;
     int neworders = GetUnitOrders();
     int role;

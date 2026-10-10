@@ -18,6 +18,7 @@
 #include "boundary.h"
 #include "watch.h"
 #include "detailed.h"
+#include "commander.h"
 #include <mmsystem.h>
 #include <sstream>
 #include <fstream>
@@ -25,6 +26,7 @@
 #include <map>
 #include <cmath>
 #include <charconv>
+extern short NumWeaponTypes;
 
 namespace {
 std::string commandText(const std::filesystem::path& path) {
@@ -111,13 +113,56 @@ void CampaignWatch::initialize(const char* scenario) {
         if (comma) out << ','; comma = true;
         out << '"' << (w - WeaponDataTable) << "\":{\"name\":" << text(w->Name, sizeof(w->Name)) << ",\"range_km\":" << w->Range << '}';
     }
-    out << "},\"objectives\":["; comma = false;
+    // Every objective class of the class table, used or not: candidates for new objectives.
+    out << "},\"objective_classes\":["; comma = false;
+    for (int i = 0; i < NumEntities; ++i) {
+        if (Falcon4ClassTable[i].dataType != DTYPE_OBJECTIVE || !Falcon4ClassTable[i].dataPtr) continue;
+        auto* c = static_cast<ObjClassDataType*>(Falcon4ClassTable[i].dataPtr);
+        const auto& info = Falcon4ClassTable[i].vuClassData.classInfo_;
+        if (comma) out << ','; comma = true;
+        out << "{\"class_id\":" << i << ",\"name\":" << text(c->Name, 20) << ",\"type\":" << int(info[VU_TYPE])
+            << ",\"stype\":" << int(info[VU_STYPE]) << ",\"sptype\":" << int(info[VU_SPTYPE])
+            << ",\"features\":" << int(c->Features) << ",\"pt_data\":" << c->PtDataIndex << ",\"template\":[";
+        // Class feature template (mapgen fits it onto real sites): [feature class, value %, east km, north km, facing deg, name].
+        for (int f = 0; f < c->Features; ++f) {
+            const FeatureEntry& e = FeatureEntryDataTable[c->FirstFeature + f];
+            auto* feature = e.Index > 0 && e.Index < NumEntities && Falcon4ClassTable[e.Index].dataType == DTYPE_FEATURE ? GetFeatureClassData(e.Index) : nullptr;
+            out << (f ? "," : "") << '[' << e.Index << ',' << int(e.Value) << ',' << e.Offset.x * 0.0003048 << ','
+                << e.Offset.y * 0.0003048 << ',' << e.Facing << ',' << (feature ? text(feature->Name, 20) : "\"Feature\"") << ']';
+        }
+        out << "]}";
+    }
+    out << "],\"objectives\":["; comma = false;
     VuListIterator it(AllObjList);
     for (Objective o = static_cast<Objective>(it.GetFirst()); o; o = static_cast<Objective>(it.GetNext())) {
         if (comma) out << ','; comma = true;
         char name[256]{}; o->GetName(name, 255, 0);
         out << '{'; common(out, o);
-        out << ",\"name\":" << text(name) << ",\"class\":" << text(o->GetObjectiveClassData()->Name, 20) << ",\"features\":[";
+        // Same parent walk as GTM BuildObjectiveLists: objective -> secondary -> primary.
+        Objective secondary = o->IsSecondary() ? o : o->GetObjectiveParent();
+        Objective primary = !secondary ? nullptr : o->IsPrimary() ? o : secondary->GetObjectiveParent();
+        out << ",\"name\":" << text(name) << ",\"class\":" << text(o->GetObjectiveClassData()->Name, 20)
+            << ",\"class_id\":" << (o->Type() - VU_LAST_ENTITY_TYPE)
+            << ",\"type\":" << int(o->GetType()) << ",\"stype\":" << int(o->GetSType()) << ",\"sptype\":" << int(o->GetSPType())
+            << ",\"primary\":" << (o->IsPrimary() ? "true" : "false")
+            << ",\"secondary\":" << (o->IsSecondary() ? "true" : "false")
+            << ",\"parent\":" << text(o->GetObjectiveParent() ? id(o->GetObjectiveParentID()).c_str() : "")
+            << ",\"priority\":" << o->GetObjectivePriority()
+            << ",\"primary_parent\":" << text(primary ? id(primary->Id()).c_str() : "") << ",\"links\":[";
+        for (int n = 0, written = 0; n < o->NumLinks(); ++n) {
+            Objective neighbor = o->GetNeighbor(n);
+            if (!neighbor) continue;
+            if (written++) out << ',';
+            out << text(id(neighbor->Id()).c_str());
+        }
+        // Per link, aligned with "links": native path cost for tracked and wheeled units (255 = impassable).
+        out << "],\"link_costs\":[";
+        for (int n = 0, written = 0; n < o->NumLinks(); ++n) {
+            if (!o->GetNeighbor(n)) continue;
+            if (written++) out << ',';
+            out << '[' << int(o->GetNeighborCost(n, Tracked)) << ',' << int(o->GetNeighborCost(n, Wheeled)) << ']';
+        }
+        out << "],\"site_layout\":" << (o->feature_layout ? "true" : "false") << ",\"features\":[";
         for (int f = 0; f < o->GetTotalFeatures(); ++f) {
             if (f) out << ',';
             int index = o->GetFeatureID(f);
@@ -127,7 +172,7 @@ void CampaignWatch::initialize(const char* scenario) {
             float north = 0, east = 0, z = 0; o->GetFeatureOffset(f, &east, &north, &z);
             out << "{\"name\":" << (feature ? text(feature->Name, 20) : "\"Feature\"")
                 << ",\"class_id\":" << index
-                << ",\"heading_deg\":" << FeatureEntryDataTable[o->GetObjectiveClassData()->FirstFeature + f].Facing
+                << ",\"heading_deg\":" << o->GetFeatureFacing(f)
                 << ",\"dx\":" << east * 0.0003048 << ",\"dy\":" << north * 0.0003048 << '}';
         }
         out << "]}";
@@ -204,9 +249,36 @@ void CampaignWatch::unitAction() {
     actionStatus=QueueDetailedAction(static_cast<uint32_t>(creator),static_cast<uint32_t>(number),action);
 }
 
+void CampaignWatch::saveCommand() {
+    const auto request=commandText(directory/"save.txt");
+    unsigned long long seq=0;
+    const auto parsed=std::from_chars(request.data(),request.data()+request.size(),seq);
+    if(parsed.ec!=std::errc{} || parsed.ptr!=request.data()+request.size() || seq<=saveSequence) return;
+    saveSequence=seq;saveError.clear();savePath.clear();
+    if(!paused || remainingStepMs || consumedSteps!=requestedSteps || regionActive || DetailedRegionActive()) {saveStatus="requires_paused_aggregate";return;}
+    try {
+        const auto destination=directory/("checkpoint-"+std::to_string(seq));
+        SaveAggregateCheckpoint(destination);
+        savePath=destination.filename().string();saveStatus="saved";
+    } catch(const std::exception& error) {saveStatus="failed";saveError=error.what();}
+}
+
+void CampaignWatch::commanderCommand() {
+    const auto request=commandText(directory/"commander.txt");
+    const auto space=request.find(' ');
+    if(space==std::string::npos) return;
+    unsigned long long seq=0;
+    const auto parsed=std::from_chars(request.data(),request.data()+space,seq);
+    if(parsed.ec!=std::errc{} || parsed.ptr!=request.data()+space || seq<=commanderSequence) return;
+    commanderSequence=seq;
+    commanderStatus=ApplyCommanderCommand(request.substr(space+1));
+}
+
 bool CampaignWatch::waitForStep() {
     for (;;) {
         command();
+        saveCommand();
+        commanderCommand();
         auto now = Clock::now();
         double elapsed = std::chrono::duration<double>(now - last).count(); last = now;
         if (stopping || now - heartbeat > std::chrono::seconds(20)) { publish("stopped"); return false; }
@@ -231,13 +303,47 @@ void CampaignWatch::publish(const char* status) {
     out << "{\"schema\":2,\"frame\":" << ++frame << ",\"status\":" << text(status)
         << ",\"time_ms\":" << TheCampaign.CurrentTime << ",\"ack\":" << sequence
         << ",\"unit_action\":{\"ack\":"<<actionSequence<<",\"status\":"<<text(actionStatus.c_str())<<"}"
+        << ",\"checkpoint\":{\"ack\":"<<saveSequence<<",\"status\":"<<text(saveStatus.c_str())<<",\"path\":"<<ff::headless::JsonString(savePath)<<",\"error\":"<<ff::headless::JsonString(saveError)<<",\"can_save\":"<<((paused&&!remainingStepMs&&consumedSteps==requestedSteps&&!regionActive&&!DetailedRegionActive())?"true":"false")<<"}"
         << ",\"speed\":" << speed << ",\"paused\":" << (paused ? "true" : "false")
         << ",\"region\":{\"active\":" << (regionActive ? "true" : "false")
         << ",\"x\":" << regionX << ",\"y\":" << regionY << ",\"radius_km\":" << regionRadius
         << ",\"combat_model\":" << text(DetailedRegionActive() ? "native" : "aggregate")
         << ",\"native_detailed_status\":" << text(DetailedRegionActive() ? "running" : "inactive") << ",\"projectiles_available\":true}"
         << ",\"detailed\":" << DetailedSnapshotJson()
-        << ",\"combat_messages\":" << ff_headless::combat.engagements << ",\"reported_losses\":" << ff_headless::combat.losses << ",\"units\":[";
+        << ",\"commander\":" << CommanderSnapshotJson()
+        << ",\"commander_command\":{\"ack\":" << commanderSequence << ",\"status\":" << text(commanderStatus.c_str()) << '}'
+        << ",\"combat_messages\":" << ff_headless::combat.engagements << ",\"reported_losses\":" << ff_headless::combat.losses << ",\"ground_fire\":[";
+    // Live diplomacy, rather than different team IDs, determines quick-battle candidates.
+    for (int team = 0; team < NUM_TEAMS; ++team) {
+        if (team) out << ',';
+        out << '[';
+        for (int target = 0; target < NUM_TEAMS; ++target) {
+            if (target) out << ',';
+            out << (GetRoE(team, target, ROE_GROUND_FIRE) == ROE_ALLOWED ? "true" : "false");
+        }
+        out << ']';
+    }
+    out << "],\"air_fire\":[";
+    for (int team = 0; team < NUM_TEAMS; ++team) {
+        if (team) out << ',';
+        out << '[';
+        for (int target = 0; target < NUM_TEAMS; ++target) {
+            if (target) out << ',';
+            out << (GetRoE(team, target, ROE_AIR_FIRE) == ROE_ALLOWED ? "true" : "false");
+        }
+        out << ']';
+    }
+    out << "],\"ground_capture\":[";
+    for (int team=0;team<NUM_TEAMS;++team) {
+        if(team) out<<',';
+        out<<'[';
+        for(int target=0;target<NUM_TEAMS;++target) {
+            if(target) out<<',';
+            out<<(GetRoE(team,target,ROE_GROUND_CAPTURE)==ROE_ALLOWED?"true":"false");
+        }
+        out<<']';
+    }
+    out << "],\"units\":[";
     bool comma = false;
     VuListIterator it(AllUnitList);
     for (Unit u = static_cast<Unit>(it.GetFirst()); u; u = static_cast<Unit>(it.GetNext())) {
@@ -249,11 +355,19 @@ void CampaignWatch::publish(const char* status) {
         out << ",\"name\":" << text(name) << ",\"class\":" << text(u->GetUnitClassName(), 20)
             << ",\"kind\":" << text(kind) << ",\"domain\":" << int(u->GetDomain())
             << ",\"altitude_m\":" << u->GetUnitAltitude() * 0.3048
+            << ",\"native_position_ft\":["<<u->XPos()<<','<<u->YPos()<<','<<u->ZPos()<<']'
             << ",\"heading_deg\":" << u->GetUnitHeading() * 45
             << ",\"aggregate\":" << (u->IsAggregate() ? "true" : "false")
+            << ",\"detailed_eligible\":" << (u->Real() && !u->Inactive() && !u->IsDead() && u->IsLocal() && u->GetTotalVehicles() > 0 ? "true" : "false")
             << ",\"vehicles\":" << u->GetTotalVehicles() << ",\"supply\":" << u->GetUnitSupply()
+            << ",\"burnt_fuel_lb\":" << (u->IsFlight()?static_cast<FlightClass*>(u)->GetBurntFuel():0)
             << ",\"morale\":" << u->GetUnitMorale() << ",\"orders\":" << u->GetUnitOrders()
-            << ",\"mission\":" << int(u->GetUnitMission()) << ",\"destination\":[" << dx << ',' << dy << "],\"equipment\":[";
+            << ",\"objective_id\":" << text(u->GetUnitObjectiveID()==FalconNullId?"":id(u->GetUnitObjectiveID()).c_str())
+            << ",\"operator_ground_order\":" << (HasDetailedGroundOrder(u->Id().creator_,u->Id().num_)?"true":"false")
+            << ",\"mission\":" << int(u->GetUnitMission())
+            << ",\"package_id\":" << text(u->IsFlight() && u->GetUnitParentID()!=FalconNullId ? id(u->GetUnitParentID()).c_str() : "")
+            << ",\"mission_target\":" << text(u->IsFlight() && u->GetUnitMissionTargetID()!=FalconNullId ? id(u->GetUnitMissionTargetID()).c_str() : "")
+            << ",\"tot_ms\":" << (u->IsFlight() ? u->GetUnitTOT() : 0) << ",\"destination\":[" << dx << ',' << dy << "],\"equipment\":[";
         std::map<int, int> equipment;
         if (u->IsFlight() || u->IsSquadron()) {
             // Air-unit roster slots represent aircraft availability, not
@@ -285,7 +399,21 @@ void CampaignWatch::publish(const char* status) {
                 out << ']';
             }
         }
-        out << "],\"route\":[";
+        bool airCombatReady=false;
+        if(u->IsFlight() && u->ZPos()<-5000 && u->GetVehicleID(0)>0 && u->GetVehicleID(0)<NumEntities &&
+           Falcon4ClassTable[u->GetVehicleID(0)].vuClassData.classInfo_[VU_TYPE]!=TYPE_HELICOPTER) {
+            auto* flight=static_cast<FlightClass*>(u);
+            for(int a=0;a<flight->GetLoadouts();++a) for(int hp=0;hp<HARDPOINT_MAX;++hp) {
+                const auto& loadout=flight->GetLoadout()[a];
+                const int weapon=loadout.WeaponID[hp];
+                if(weapon<=0 || weapon>=NumWeaponTypes || !loadout.WeaponCount[hp]) continue;
+                const int index=WeaponDataTable[weapon].Index;
+                if(index<0 || index>=NumEntities) continue;
+                const auto* info=Falcon4ClassTable[index].vuClassData.classInfo_;
+                if(info[VU_TYPE]==TYPE_MISSILE && info[VU_STYPE]==STYPE_MISSILE_AIR_AIR) airCombatReady=true;
+            }
+        }
+        out << "],\"air_combat_ready\":" << (airCombatReady ? "true" : "false") << ",\"route\":[";
         int n = 0;
         for (WayPoint wp = u->GetCurrentUnitWP(); wp && n < 64; wp = wp->GetNextWP(), ++n) {
             short x, y; wp->GetWPLocation(&x, &y);

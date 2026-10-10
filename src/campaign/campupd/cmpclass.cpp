@@ -952,8 +952,9 @@ int CampaignClass::SaveCampaign(FalconGameType gametype, char *savefile,
                                 int save_mode)
 {
 #ifdef FF_HEADLESS
-    ff_headless::unsupported("CampaignClass::SaveCampaign");
-#else
+    if(gametype!=game_Campaign || save_mode!=CAMP_SAVE_FULL)
+        ff_headless::unsupported("Only full campaign saves are supported by the headless host");
+#endif
 
     FILE *fp;
     char to[MAX_PATH], from[MAX_PATH];
@@ -969,8 +970,10 @@ int CampaignClass::SaveCampaign(FalconGameType gametype, char *savefile,
     if (gTacticalFullEdit)
         save_mode = CAMP_SAVE_FULL;
 
+#ifndef FF_HEADLESS
     if (gametype == game_TacticalEngagement)
         current_tactical_mission->save_data(savefile);
+#endif
 
     sprintf(SaveFile, savefile);
 
@@ -1044,8 +1047,6 @@ int CampaignClass::SaveCampaign(FalconGameType gametype, char *savefile,
 
     CampLeaveCriticalSection();
     return 1;
-
-#endif
 }
 
 #if NEW_END_CAMPAIGN

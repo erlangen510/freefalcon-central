@@ -2757,6 +2757,14 @@ bool DigitalBrain::SetReturnToBaseWaypoint(WayPointClass* waypoint)
     mpActionFlags[AI_EXECUTE_MANEUVER]=FALSE;
     mpActionFlags[AI_FOLLOW_FORMATION]=FALSE;
     mpActionFlags[AI_RTB]=TRUE;
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+    // The operator can issue RTB to a flight leader as well as a wingman.
+    // Retire the prior attack just as AiRejoin does; otherwise FollowWaypoints
+    // keeps running GroundAttackMode before it can fly the return waypoint.
+    agDoctrine=AGD_NONE;
+    SetGroundTarget(NULL);
+    mDesignatedObject=FalconNullId;
+#endif
     self->curWaypoint=waypoint;
     return true;
 }

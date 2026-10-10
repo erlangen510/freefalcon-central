@@ -468,6 +468,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="RedProfiler.cpp" />
+    <ClCompile Include="src\ui\src\native_observer.cpp" />
     <ClCompile Include="src\ui\src\F4Config.cpp" />
     <ClCompile Include="src\Ui\Src\Winmain.cpp">
       <WarningLevel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Level3</WarningLevel>

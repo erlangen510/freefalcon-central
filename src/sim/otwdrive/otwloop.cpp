@@ -4299,6 +4299,9 @@ void OTWDriverClass::RenderFrame()
     //STOP_PROFILE("OTW Loop");
     if (not xrStereoEyes)
         DisplayFrontText();
+#ifdef FF_NATIVE_OBSERVER
+    if (not xrStereoEyes) DrawObserverOverlay();
+#endif
     /*MAIN_PROFILE("OTW Loop");*/
     //START_PROFILE("OTWRENDER");
 

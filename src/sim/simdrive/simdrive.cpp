@@ -463,6 +463,7 @@ void SimulationDriver::Exit(void)
     F4SoundStop();
 }
 
+#include "include/native_observer.h"
 void SimulationDriver::Cycle()
 {
     //START_PROFILE("SIMCYCLE_BEGIN");
@@ -487,7 +488,7 @@ void SimulationDriver::Cycle()
         // Check if the graphics are runnning and read inputs, if so.
         if (curFlyState == FLYSTATE_FLYING or curFlyState == FLYSTATE_DEAD)
         {
-            UserStickInputs.Update();
+            if (!NativeObserver::Active()) UserStickInputs.Update();
             runGraphics = true;
         }
         else

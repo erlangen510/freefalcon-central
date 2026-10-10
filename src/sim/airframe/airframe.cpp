@@ -1332,6 +1332,58 @@ void AirframeClass::RunHeliModel(void)
     }
 }
 
+#ifdef FF_DETAILED_ENGINE
+// Explicit pointer-free motion layout. Changes require a boundary file version.
+#define FF_MOTION_FIELDS(F) \
+ F(x) F(y) F(z) F(xdot) F(ydot) F(zdot) F(vt) F(vcas) F(rho) \
+ F(p) F(q) F(r) F(mach) F(vRot) F(alpha) F(beta) F(theta) F(phi) F(psi) \
+ F(gmma) F(sigma) F(mu) F(e1) F(e2) F(e3) F(e4) F(vtDot) \
+ F(nxcgb) F(nycgb) F(nzcgb) F(nxcgs) F(nycgs) F(nzcgs) F(nxcgw) F(nycgw) F(nzcgw) \
+ F(alpdot) F(betdot) F(slice) F(pitch) F(rpm) F(rpm2) \
+ F(pstick) F(rstick) F(ypedal) F(throtl) F(pwrlev) F(engine1Throttle) F(engine2Throttle) \
+ F(pwrlevEngine1) F(pwrlevEngine2) F(ptrmcmd) F(rtrmcmd) F(ytrmcmd) \
+ F(dbrake) F(gearPos) F(gearHandle) F(speedBrake) F(lefPos) F(tefPos) \
+ F(pshape) F(rshape) F(yshape) F(pstab) F(rstab) F(plsdamp) F(rlsdamp) F(ylsdamp) \
+ F(rshape1) F(pshape1) F(yshape1) F(avgPdelta) F(avgRdelta) F(avgYdelta) F(oldnzcgs) \
+ F(qbar) F(qsom) F(qovt) F(stallMagnitude) F(desiredMagnitude) F(loadingFraction) \
+ F(oscillationTimer) F(oscillationSlope)
+#define FF_MOTION_ARRAYS(F) \
+ F(oldp01) F(oldp02) F(oldp03) F(oldp04) F(oldp05) F(oldr01) F(oldy01) F(oldy03) \
+ F(olda01) F(oldRpm) F(oldRpm2) F(oldp01Eng2) F(olda012) F(oldTurb1) F(oldRoll1)
+unsigned AirframeClass::FlightMotionFieldCount() {
+    unsigned count=2;
+#define COUNT_FIELD(name) ++count;
+#define COUNT_ARRAY(name) count+=6;
+    FF_MOTION_FIELDS(COUNT_FIELD) FF_MOTION_ARRAYS(COUNT_ARRAY)
+#undef COUNT_FIELD
+#undef COUNT_ARRAY
+    return count;
+}
+std::vector<float> AirframeClass::CaptureFlightMotion() const {
+    if(!IsSet(InAir) || simpleMode==SIMPLE_MODE_HF) return {};
+    std::vector<float> state{float(simpleMode),float(stallMode)};
+#define SAVE_FIELD(name) state.push_back(name);
+#define SAVE_ARRAY_FIELD(name) for(float value:name) state.push_back(value);
+    FF_MOTION_FIELDS(SAVE_FIELD) FF_MOTION_ARRAYS(SAVE_ARRAY_FIELD)
+#undef SAVE_FIELD
+#undef SAVE_ARRAY_FIELD
+    return state;
+}
+void AirframeClass::RestoreFlightMotion(const std::vector<float>& state,float dx,float dy,float dz) {
+    if(state.size()!=FlightMotionFieldCount() || !IsSet(InAir)) return;
+    simpleMode=int(state[0]);stallMode=static_cast<StallMode>(int(state[1]));unsigned cursor=2;
+#define LOAD_FIELD(name) name=state[cursor++];
+#define LOAD_ARRAY_FIELD(name) for(float& value:name) value=state[cursor++];
+    FF_MOTION_FIELDS(LOAD_FIELD) FF_MOTION_ARRAYS(LOAD_ARRAY_FIELD)
+#undef LOAD_FIELD
+#undef LOAD_ARRAY_FIELD
+    x+=dx;y+=dy;z+=dz;
+    Trigenometry();
+    platform->SetVuPosition();
+}
+#undef FF_MOTION_FIELDS
+#undef FF_MOTION_ARRAYS
+#endif
 int AirframeClass::AddFuel(float lbs)
 {
     if (fuel + lbs < 0.0F)

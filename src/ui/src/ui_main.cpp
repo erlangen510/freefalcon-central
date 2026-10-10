@@ -48,6 +48,8 @@
 #include "queue.h"
 #include "ui_ia.h"
 #include "cmap.h"
+#include "gps.h"
+extern GlobalPositioningSystem *gGps;
 #include "userids.h"
 #include "textids.h"
 #include "graphics/include/matrix.h"
@@ -1786,6 +1788,16 @@ void UI_Cleanup()
 
     // End Event Loop
     Sleep(10);
+
+    // Refreshers own references into the map and mission/ATO/OOB trees.
+    // Destroy them while those controls still exist; SetupGPS recreates them
+    // when returning from 3D, instead of reusing freed MAPICONLIST pointers.
+    if (gGps)
+    {
+        gGps->Cleanup();
+        delete gGps;
+        gGps = NULL;
+    }
 
     if (gMapMgr)
     {

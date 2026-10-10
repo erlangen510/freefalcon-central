@@ -2,6 +2,7 @@
 #define _SIXDOF_H
 
 #include <iso646.h>
+#include <vector>
 #include "mathlib/math.h"
 #include "mathlib/vector.h"
 #include "mathlib/matrix.h"
@@ -1758,6 +1759,12 @@ public:
     int AddFuel(float lbs); //this checks whether we're full
     void ClearFuel(void);
     void AllocateFuel(float totalfuel);
+#ifdef FF_DETAILED_ENGINE
+    void RestoreRemainingFuel(float totalfuel);
+    std::vector<float> CaptureFlightMotion() const;
+    static unsigned FlightMotionFieldCount();
+    void RestoreFlightMotion(const std::vector<float>& state,float dx,float dy,float dz);
+#endif
     int BurnFuel(float bfuel);
     void RecalculateFuel(void);
     void FeedTank(int t1, int t2, float dt);

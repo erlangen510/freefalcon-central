@@ -1,4 +1,5 @@
 #include "scenario.h"
+#include "boundary.h"
 #include "utils/lzss.h"
 #include <algorithm>
 #include <iostream>
@@ -17,6 +18,18 @@ void rejects(const Bytes& bytes) {
 }
 int main() {
     try {
+        ff_headless::CombatCounters journal;
+        for(unsigned i=0;i<600;++i) {
+            ff_headless::CombatEvent event;
+            event.shooterNumber=i;event.damage=(i%2)==0;
+            journal.record(event);
+        }
+        check(journal.events.size()==512 && journal.events.front().sequence==89 && journal.events.back().sequence==600,
+              "combat journal must bound memory and expose omitted sequence numbers");
+        check(journal.events.front().shooterNumber==88 && journal.events.back().shooterNumber==599,
+              "combat journal must preserve value identity across eviction");
+        journal={};
+        check(journal.events.empty() && journal.eventSequence==0,"combat journal reset must clear prior run");
         std::mt19937 rng(12345);
         // Native compressor compatibility, dictionary wrap and overlapping copies.
         for (int n : {1, 2, 7, 8, 9, 17, 256, 4096, 8193, 20000}) {

@@ -159,6 +159,8 @@ ObjectiveClass::ObjectiveClass(int typeindex)
     int size;
 
     dirty_objective = 0;
+    feature_layout = NULL;
+    point_transform = NULL;
     static_data.first_owner = 0;
     static_data.nameid = 0;
     static_data.class_data =
@@ -213,6 +215,8 @@ ObjectiveClass::ObjectiveClass(VU_BYTE **stream, long *rem)
     uchar size, nsize, i;
 
     dirty_objective = 0;
+    feature_layout = NULL;
+    point_transform = NULL;
     static_data.class_data =
         (ObjClassDataType *)
             Falcon4ClassTable[share_.entityType_ - VU_LAST_ENTITY_TYPE]
@@ -773,7 +777,7 @@ int ObjectiveClass::Deaggregate(FalconSessionEntity *session)
             simdata.x = XPos() + x;
             simdata.y = YPos() + y;
             simdata.heading =
-                (float)(FeatureEntryDataTable[fid].Facing) * DEG_TO_RADIANS;
+                (float)(GetFeatureFacing(f)) * DEG_TO_RADIANS;
             simdata.displayPriority = fc->Priority;
             newObject = AddObjectToSim(&simdata, 0);
 
@@ -1186,7 +1190,7 @@ void ObjectiveClass::DeaggregateFromData(VU_BYTE *data, long size)
         simdata.x = XPos() + x;
         simdata.y = YPos() + y;
         simdata.heading =
-            (float)(FeatureEntryDataTable[fid].Facing) * DEG_TO_RADIANS;
+            (float)(GetFeatureFacing(simdata.campSlot)) * DEG_TO_RADIANS;
         simdata.displayPriority = fc->Priority;
 
         memcpychk(&value, &data, sizeof(uchar), rem);
@@ -2020,6 +2024,8 @@ void ObjectiveClass::SetObjectiveClass(int dindex)
     int nsize;
 
     SetEntityType((ushort)dindex);
+    feature_layout = NULL;
+    point_transform = NULL;
     static_data.class_data =
         (ObjClassDataType *)Falcon4ClassTable[dindex - VU_LAST_ENTITY_TYPE]
             .dataPtr;
@@ -2615,6 +2621,14 @@ int ObjectiveClass::GetFeatureOffset(int f, float *x, float *y, float *z)
     if (not static_data.class_data)
         return 0;
 
+    if (feature_layout and f < static_data.class_data->Features)
+    {
+        *x = feature_layout[f].x;
+        *y = feature_layout[f].y;
+        *z = feature_layout[f].z;
+        return 1;
+    }
+
     *x = FeatureEntryDataTable[static_data.class_data->FirstFeature + f]
              .Offset.x;
     *y = FeatureEntryDataTable[static_data.class_data->FirstFeature + f]
@@ -2622,6 +2636,18 @@ int ObjectiveClass::GetFeatureOffset(int f, float *x, float *y, float *z)
     *z = FeatureEntryDataTable[static_data.class_data->FirstFeature + f]
              .Offset.z;
     return 1;
+}
+
+int ObjectiveClass::GetFeatureFacing(int f)
+{
+    if (f < 0 or f > 255 or not static_data.class_data)
+        return 0;
+
+    if (feature_layout and f < static_data.class_data->Features)
+        return feature_layout[f].facing;
+
+    return FeatureEntryDataTable[static_data.class_data->FirstFeature + f]
+        .Facing;
 }
 
 void ObjectiveClass::ResetObjectiveStatus(void)

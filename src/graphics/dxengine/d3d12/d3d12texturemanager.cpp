@@ -1032,7 +1032,7 @@ void D3D12TexMgr_SyncRenderQueue(ID3D12CommandQueue* renderQueue)
 // Pure NVTT (backend-agnostic); the terrain/fartex DDS cache calls SaveBCnDDS to bake a .dds. NVTT 3.x is
 // x64-only here -> the real path compiles only under _WIN64 (or when forced); Win32 degrades to a no-op stub
 // (the runtime never authors DDS -- it loads ready ones).
-#if defined(_WIN64) || defined(REDVIPER_USE_NVTT3)
+#if (defined(_WIN64) || defined(REDVIPER_USE_NVTT3)) && !defined(FF_NO_NVTT3)
 #include <nvtt/nvtt.h>
 
 // nvtt30205.lib is linked via the Falcon4 x64 AdditionalDependencies (not a #pragma here -- /NODEFAULTLIB

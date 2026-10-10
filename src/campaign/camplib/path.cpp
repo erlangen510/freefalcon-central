@@ -343,7 +343,9 @@ float GetMovementCost(GridIndex x, GridIndex y, MoveType move, int flags,
                 GridIndex ux = 0, uy = 0;
                 bool assignedEng = false;
 
-                while (u)
+                // No objective within the search radius: no bridge controls this crossing.
+                // (The engineer check below dereferenced it unconditionally.)
+                while (u and o)
                 {
                     if (u->IsBrigade() or u->GetDomain() not_eq DOMAIN_LAND or
                         u->GetTeam() not_eq o->GetTeam())
@@ -404,10 +406,10 @@ float GetMovementCost(GridIndex x, GridIndex y, MoveType move, int flags,
             {
                 o = FindNearestObjective(x, y, NULL);
 
-                if (o->GetType() == TYPE_PORT or
+                if (o and (o->GetType() == TYPE_PORT or
                     (o->GetType() == TYPE_BRIDGE and
                      (o->GetObjectiveStatus() > 0 or
-                      flags bitand PATH_ENGINEER)))
+                      flags bitand PATH_ENGINEER))))
                     cost = 0.5F;
             }
             else if (flags bitand PATH_RAILOK and

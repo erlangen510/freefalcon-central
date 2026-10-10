@@ -1,5 +1,6 @@
 #ifdef FF_HEADLESS
 #include "headless/boundary.h"
+#include "headless/detailed.h"
 #endif
 #include <stdio.h>
 #include <conio.h>
@@ -531,9 +532,13 @@ int BattalionClass::MoveUnit(CampaignTime time)
 
     // Check if we have a valid objective
     lo = GetUnitObjective();
+    bool validateManagerObjective=true;
+#if defined(FF_HEADLESS) && defined(FF_DETAILED_ENGINE)
+    validateManagerObjective=!HasDetailedGroundOrder(Id().creator_,Id().num_);
+#endif
 
     if (not lo or
-        (Parent() and (FalconLocalGame->GetGameType() == game_Campaign) and
+        (validateManagerObjective and Parent() and (FalconLocalGame->GetGameType() == game_Campaign) and
          not TeamInfo[GetTeam()]->gtm->IsValidObjective(GetOrders(), lo)))
     {
         if (Parent())

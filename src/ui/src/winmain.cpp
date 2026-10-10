@@ -449,6 +449,14 @@ signed int PASCAL handle_WinMain(HINSTANCE h_instance,
 #endif // NDEBUG
 
 #ifdef _WIN32
+#ifdef FF_NATIVE_OBSERVER
+    // Render and pick in physical monitor pixels instead of DPI-virtualized
+    // coordinates stretched by Windows. Must precede all window creation.
+    typedef BOOL (WINAPI *SetDpiAwareFn)();
+    SetDpiAwareFn setDpiAware = reinterpret_cast<SetDpiAwareFn>(
+        GetProcAddress(GetModuleHandleA("user32.dll"), "SetProcessDPIAware"));
+    if (setDpiAware) setDpiAware();
+#endif
     // render-port: don't break/crash on CRT debug checks (invalid parameter, asserts).
     // STL iterator checks disabled via _ITERATOR_DEBUG_LEVEL=0 (in all projects).
     _set_invalid_parameter_handler([](const wchar_t *, const wchar_t *,
@@ -1446,6 +1454,34 @@ void ParseCommandLine(LPSTR cmdLine)
     strcpy(FalconSoundThrDirectory, FalconDataDirectory);
     strcat(FalconSoundThrDirectory, "/sounds");
     retval = RegCloseKey(theKey);
+#ifdef _WIN32
+    // A source build can use an isolated data installation without replacing
+    // the registry paths of the user's original FF6 distribution.
+    char observerDataRoot[MAX_PATH] = {};
+    DWORD observerRootLength = GetEnvironmentVariableA(
+        "FF_DATA_ROOT", observerDataRoot, sizeof(observerDataRoot));
+    if (observerRootLength)
+    {
+        if (observerRootLength >= sizeof(observerDataRoot) - 64 ||
+            GetFileAttributesA(observerDataRoot) == INVALID_FILE_ATTRIBUTES)
+        {
+            MessageBoxA(NULL, "FF_DATA_ROOT must name an existing short data directory.",
+                        "FreeFalcon data directory", MB_OK | MB_ICONERROR);
+            exit(1);
+        }
+        for (char *p = observerDataRoot; *p; ++p)
+            if (*p == '\\') *p = '/';
+        strcpy(FalconDataDirectory, observerDataRoot);
+        strcpy(FalconUIArtDirectory, observerDataRoot);
+        strcpy(FalconUIArtThrDirectory, observerDataRoot);
+        strcpy(FalconUISoundDirectory, observerDataRoot);
+        sprintf(FalconTerrainDataDir, "%s/terrdata/korea", observerDataRoot);
+        sprintf(FalconObjectDataDir, "%s/terrdata/objects", observerDataRoot);
+        strcpy(Falcon3DDataDir, FalconObjectDataDir);
+        sprintf(FalconMiscTexDataDir, "%s/terrdata/misctex", observerDataRoot);
+        sprintf(FalconSoundThrDirectory, "%s/sounds", observerDataRoot);
+    }
+#endif
 }
 
 

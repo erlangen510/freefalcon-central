@@ -64,6 +64,13 @@ void FackClass::SetFault(FaultClass::type_FSubSystem subsystem,
                          FaultClass::type_FSeverity severity, BOOL doWarningMsg)
 {
     AircraftClass *playerAC = SimDriver.GetPlayerAircraft();
+#ifdef FF_DETAILED_ENGINE
+    // AI fault state is independent of the cockpit warning scheduler below.
+    if(playerAC==NULL) {
+        mFaults.SetFault(subsystem,function,severity,FALSE);
+        return;
+    }
+#endif
 
     if (playerAC == NULL)
         return;

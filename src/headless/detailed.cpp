@@ -27,6 +27,8 @@
 #include "sms.h"
 #include "guns.h"
 #include "falcdmg.h"
+#include "msginc/damagemsg.h"
+#include "fack.h"
 #include <sstream>
 #include "drawbsp.h"
 #include "fcc.h"
@@ -805,6 +807,8 @@ unsigned RunBvrPursuitDiagnostic(AircraftClass* aircraft, AircraftClass* target)
     brain->reactiont=0;
     const float x=aircraft->XPos()+10000, y=aircraft->YPos(), z=aircraft->ZPos();
     target->SetYPR(0,0,0);target->SetDelta(1000,0,0);
+    // SetYPR changes pose fields; relative geometry reads the cached matrix.
+    CalcTransformMatrix(target);
     unsigned refreshes=0;float previous=-1;
     // Controlled moving-target input to the original pursuit controller.
     // No sensor lock, fire or damage outcome is being tested here.
@@ -884,7 +888,101 @@ unsigned VerifyRocketDispersion(MissileClass* rocket) {
     }
     return checked;
 }
-void RunDetailedDiagnostic(const std::string& testCase) {
+static void RunAircraftConditionDiagnostic(FlightClass* flight,bool damageCase=false,bool faultCase=false) {
+    std::map<int,std::pair<float,float>> expected;
+    std::map<int,std::vector<float>> expectedMotion;
+    if(damageCase) for(int frame=0;frame<250;++frame) AdvanceDetailedFrame();
+    const std::array<float,3> motionAnchor={flight->XPos(),flight->YPos(),flight->ZPos()};
+    {
+        VuListIterator actors(flight->GetComponents());
+        for(auto* e=actors.GetFirst();e;e=actors.GetNext()) {
+            auto* aircraft=static_cast<AircraftClass*>(e);
+            const float fuel=aircraft->af->Fuel()+aircraft->af->ExternalFuel();
+            aircraft->af->RestoreRemainingFuel(fuel-123.0f*(aircraft->pilotSlot+1));
+            if(damageCase) {
+                if(!aircraft->Guns) throw std::runtime_error("Damage checkpoint fixture requires a native gun");
+                auto* message=new FalconDamageMessage(aircraft->Id(),FalconLocalGame,TRUE);
+                message->dataBlock={};
+                message->dataBlock.damageType=FalconDamageType::BulletDamage;
+                message->dataBlock.damageRandomFact=1.0f;
+                message->dataBlock.dEntityID=aircraft->Id();message->dataBlock.dCampID=flight->GetCampID();
+                message->dataBlock.dPilotID=aircraft->pilotSlot;message->dataBlock.dIndex=aircraft->Type();message->dataBlock.dSide=aircraft->GetTeam();
+                message->dataBlock.fWeaponID=aircraft->Guns->Type();
+                const auto previous=ff_headless::combat.detailedDamageMessages;
+                FalconSendMessage(message,TRUE);DispatchDetailedMessages();
+                if(ff_headless::combat.detailedDamageMessages!=previous+1 || !(aircraft->Strength()>0 && aircraft->Strength()<aircraft->MaxStrength()))
+                    throw std::runtime_error("Native bullet damage did not leave a damaged survivor");
+            } else aircraft->RestoreRemainingStrength(aircraft->MaxStrength()*(0.8f-0.05f*aircraft->pilotSlot));
+            if(faultCase) {
+                aircraft->mFaults->SetFault(FaultClass::fcr_fault,FaultClass::xmtr,FaultClass::fail,FALSE);
+                aircraft->af->HydrBreak(aircraft->pilotSlot%2?AirframeClass::HYDR_B_SYSTEM:AirframeClass::HYDR_A_SYSTEM);
+                aircraft->af->GeneratorBreak(aircraft->pilotSlot%2?AirframeClass::GenStdby:AirframeClass::GenMain);
+            }
+            expected[aircraft->pilotSlot]={aircraft->af->Fuel()+aircraft->af->ExternalFuel(),aircraft->Strength()};
+            expectedMotion[aircraft->pilotSlot]=aircraft->af->CaptureFlightMotion();
+        }
+    }
+    if(expected.size()<2) throw std::runtime_error("Condition fixture requires multiple native aircraft");
+    const auto initialDetail=DetailedSnapshotJson();
+    unsigned checked=0;
+    for(int cycle=0;cycle<3;++cycle) {
+        if(!flight->Reaggregate(FalconLocalSession)) throw std::runtime_error("Condition reaggregation failed");
+        flight->UseFuel(37);
+        if(!flight->Deaggregate(FalconLocalSession)) throw std::runtime_error("Condition recreation failed");
+        flight->Wake();
+        VuListIterator actors(flight->GetComponents());
+        for(auto* e=actors.GetFirst();e;e=actors.GetNext()) {
+            auto* aircraft=static_cast<AircraftClass*>(e);
+            if(!aircraft->IsAwake()) aircraft->Wake();
+            const auto found=expected.find(aircraft->pilotSlot);
+            if(found==expected.end()) throw std::runtime_error("Condition pilot identity changed");
+            const float fuel=aircraft->af->Fuel()+aircraft->af->ExternalFuel();
+            const auto motion=aircraft->af->CaptureFlightMotion();
+            const auto& savedMotion=expectedMotion.at(aircraft->pilotSlot);
+            if(motion.empty() || motion.size()!=savedMotion.size()) throw std::runtime_error("Motion field layout or airborne state lost");
+            for(unsigned field=0;field<motion.size();++field) {
+                float wanted=savedMotion[field];
+                if(field==2) wanted+=flight->XPos()-motionAnchor[0];
+                if(field==3) wanted+=flight->YPos()-motionAnchor[1];
+                if(field==4) wanted+=flight->ZPos()-motionAnchor[2];
+                if(fabs(motion[field]-wanted)>0.0001f) throw std::runtime_error("Native flight motion field changed on recreation: "+std::to_string(field));
+            }
+            if(faultCase && (!(aircraft->mFaults->GetFault(FaultClass::fcr_fault)&FaultClass::xmtr) ||
+               !(aircraft->af->hydrAB&(aircraft->pilotSlot%2?AirframeClass::HYDR_B_BROKE:AirframeClass::HYDR_A_BROKE)) ||
+               aircraft->af->GeneratorOK(aircraft->pilotSlot%2?AirframeClass::GenStdby:AirframeClass::GenMain)))
+                throw std::runtime_error("Native equipment failure disappeared during recreation");
+            if(fabs(fuel-(found->second.first-37.0f*(cycle+1)))>0.02f || aircraft->Strength()!=found->second.second ||
+               fabs(aircraft->pctStrength-aircraft->Strength()/aircraft->MaxStrength())>0.00001f)
+                throw std::runtime_error("Individual aircraft fuel or remaining strength changed on recreation");
+            ++checked;
+        }
+    }
+    if(!flight->Reaggregate(FalconLocalSession)) throw std::runtime_error("Condition final cleanup failed");
+    std::cout<<"{\"status\":\"ok\",\"case\":\""<<(damageCase?"air-damage-checkpoint":"air-condition")<<"\",\"aircraft\":"<<expected.size()<<",\"recreations_checked\":"<<checked<<",\"aggregate_burn_per_cycle_lb\":37,\"cycles\":3,\"damage_messages\":"<<ff_headless::combat.detailedDamageMessages
+             <<",\"flight_id\":\""<<flight->Id().creator_<<":"<<flight->Id().num_<<"\",\"x\":"<<flight->YPos()/3280.839895<<",\"y\":"<<flight->XPos()/3280.839895<<",\"pilots\":[";
+    bool comma=false;for(const auto& [slot,state]:expected) {
+        if(comma)std::cout<<',';comma=true;
+        std::cout<<"{\"slot\":"<<slot<<",\"fuel_lb\":"<<state.first-111.0f<<",\"strength\":"<<state.second<<'}';
+    }
+    std::cout<<"],\"motion_fields\":"<<AirframeClass::FlightMotionFieldCount()<<",\"motion_anchor\":["<<motionAnchor[0]<<','<<motionAnchor[1]<<','<<motionAnchor[2]<<"],\"fault_fixture\":"<<(faultCase?"true":"false")<<",\"initial_detail\":"<<initialDetail<<",\"scope\":\"controlled native damage messages and optional equipment faults; no projectile trajectory claim\"}"<<std::endl;
+}
+void RunDetailedDiagnostic(const std::string& requestedCase) {
+    const bool conditionCase=requestedCase=="air-condition" || requestedCase=="air-damage-checkpoint" || requestedCase=="air-fault-checkpoint";
+    const std::string testCase=conditionCase?"air":requestedCase;
+    if(testCase=="grid-roundtrip") {
+        const unsigned original=_controlfp(0,0);
+        unsigned nearestMismatch=0,truncatedMismatch=0;
+        _controlfp(_RC_NEAR,MCW_RC);
+        for(short cell=0;cell<1024;++cell) if(SimToGrid(GridToSim(cell))!=cell) ++nearestMismatch;
+        _controlfp(_RC_CHOP,MCW_RC);
+        for(short cell=0;cell<1024;++cell) if(SimToGrid(GridToSim(cell))!=cell) ++truncatedMismatch;
+        _controlfp(original,MCW_RC);
+        if((original & MCW_RC)!=_RC_CHOP || !nearestMismatch || truncatedMismatch)
+            throw std::runtime_error("Native grid conversion requires the original truncate rounding mode");
+        std::cout<<"{\"status\":\"ok\",\"case\":\"grid-roundtrip\",\"cells\":1024,\"nearest_mismatches\":"<<nearestMismatch
+                 <<",\"truncate_mismatches\":"<<truncatedMismatch<<",\"startup_truncate\":true}"<<std::endl;
+        return;
+    }
     if(testCase=="tanker-request" || testCase=="tanker-discovery" || testCase=="tanker-flight") {
         // Match entering detailed mode after campaign planning has already
         // created support flights, rather than subscribing before their birth.
@@ -1276,6 +1374,12 @@ void RunDetailedDiagnostic(const std::string& testCase) {
                     if(recovered.size()==aircrafts.size()) {++recoveryFrames;break;}
                 }
                 if(recovered.size()!=aircrafts.size()) throw std::runtime_error("Landed aircraft did not finish native recovery within 30 minutes");
+                for(int slot:recovered) {
+                    int evidence=0;
+                    for(const auto& event:ff_headless::combat.recoveries)
+                        if(event.flightCreator==flight->Id().creator_ && event.flightNumber==flight->Id().num_ && event.slot==slot && event.onGround) ++evidence;
+                    if(evidence!=1) throw std::runtime_error("Native squadron recovery journal missing or duplicated");
+                }
                 if((testCase=="return-taxi" || testCase=="airstrip-return") && (taxiDetail=="{}" || taxiRecovered!=int(aircrafts.size()))) throw std::runtime_error("Aircraft recovered without completing native runway exit/taxi");
                 for(int cleanup=0;cleanup<300;++cleanup) AdvanceDetailedFrame();
                 for(const auto& keep:aircrafts) {
@@ -1827,6 +1931,7 @@ void RunDetailedDiagnostic(const std::string& testCase) {
                     if(testCase=="rocket-predictor" && h->GetCampaignObject()==a && weapon && weapon->IsLauncher()) {
                         VuBin<MissileClass> probe(static_cast<MissileClass*>(InitAMissile(h,static_cast<BombClass*>(weapon)->LauGetWeaponId(),0)));
                         const float savedYaw=h->Yaw(),savedPitch=h->Pitch(),savedRoll=h->Roll();
+                        float maximumAxisError=0,maximumAxisBound=0;
                         for(float heading:{0.0f,float(PI*0.5)}) {
                             h->SetYPR(heading,-0.25f,0);
                             float ix=0,iy=0,iz=0,time=0;
@@ -1837,13 +1942,25 @@ void RunDetailedDiagnostic(const std::string& testCase) {
                             if(!std::isfinite(time) || time<=0 || fabs(iz-impactTerrain)>0.1f)
                                 throw std::runtime_error("Rocket predictor returned no terrain intersection or flight time");
                             fprintf(stderr,"[rocket-predictor] heading=%.3f dx=%.1f dy=%.1f\n",heading,dx,dy);
+                            // Native FITust stores one world-position float sum
+                            // per step. Under the original truncate mode, a tiny
+                            // negative cross-axis velocity can lose one ULP each
+                            // step at large theater coordinates. Bound that
+                            // quantization rather than demand sub-ULP integration.
+                            const float coordinate=heading==0?h->YPos():h->XPos();
+                            const float ulp=fabs(coordinate-std::nextafter(coordinate,0.0f));
+                            const float axisBound=1.0f+ulp*(float(ceil(time/SimLibMinorFrameTime))+1.0f);
+                            const float axisError=heading==0?fabs(dy):fabs(dx);
+                            if(axisError>maximumAxisError) maximumAxisError=axisError;
+                            if(axisBound>maximumAxisBound) maximumAxisBound=axisBound;
+                            fprintf(stderr,"[rocket-axis-roundoff] ulp=%.6f steps=%.0f bound=%.3f error=%.3f\n",ulp,ceil(time/SimLibMinorFrameTime),axisBound,axisError);
                             if(!std::isfinite(ix) || !std::isfinite(iy) || !std::isfinite(iz) ||
-                                (heading==0 ? (dx<=0 || fabs(dy)>1) : (dy<=0 || fabs(dx)>1)))
+                                (heading==0 ? dx<=100*axisBound : dy<=100*axisBound) || axisError>axisBound)
                                 throw std::runtime_error("Rocket impact prediction does not follow native heading axes");
                         }
                         h->SetYPR(savedYaw,savedPitch,savedRoll);
                         SetDetailedRegion(false,x,y,10);
-                        std::cout<<"{\"status\":\"ok\",\"case\":\"rocket-predictor\",\"directions_checked\":2}"<<std::endl;
+                        std::cout<<"{\"status\":\"ok\",\"case\":\"rocket-predictor\",\"directions_checked\":2,\"maximum_axis_error_ft\":"<<maximumAxisError<<",\"axis_roundoff_bound_ft\":"<<maximumAxisBound<<"}"<<std::endl;
                         return;
                     }
                     if(weapon) {
@@ -2521,6 +2638,7 @@ void RunDetailedDiagnostic(const std::string& testCase) {
         }
         if(testCase=="bomb-ground-hit" || testCase=="bomb-ground-miss") { RunBombDamageDiagnostic(static_cast<AircraftClass*>(starts.begin()->first),testCase=="bomb-ground-hit");return; }
         if(testCase=="rocket-legacy-pod") { RunLegacyRocketDiagnostic(static_cast<AircraftClass*>(starts.begin()->first));return; }
+        if(conditionCase) { RunAircraftConditionDiagnostic(static_cast<FlightClass*>(ground),requestedCase!="air-condition",requestedCase=="air-fault-checkpoint");return; }
         if(testCase=="rocket-hold") { RunRocketHoldDiagnostic(static_cast<AircraftClass*>(starts.begin()->first));return; }
         if(testCase=="bomb-hold" || testCase=="bomb-flight") { RunBombHoldDiagnostic(static_cast<AircraftClass*>(starts.begin()->first),testCase=="bomb-flight");return; }
         if(testCase=="ground-retarget") {

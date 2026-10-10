@@ -9,6 +9,7 @@
 ***************************************************************************/
 #include <cfenv> // Artscout - 2026 (Linux port): fesetround/FE_TOWARDZERO for the FPU rounding mode
 #include "stdhdr.h"
+#include "include/native_observer.h"
 #include "graphics/include/loader.h"
 #include "find.h"
 #include "flight.h"
@@ -658,6 +659,8 @@ void SimulationLoopControl::StartLoop(void)
     while (1)
     {
         WaitForSingleObject(wait_for_start_graphics, INFINITE);
+        const bool observing = NativeObserver::Requested();
+        player = NULL;
 
         //if the voices try to play during this time the sounds get all messed up, so be quiet
         F4SilenceVoices();
@@ -717,8 +720,25 @@ void SimulationLoopControl::StartLoop(void)
 
         // Get a reasonable guess as to where we are so we can start the terrain loading
         flight = FalconLocalSession->GetPlayerFlight();
-        ShiAssert(flight);
+        ShiAssert(flight || observing);
 
+#ifdef FF_NATIVE_OBSERVER
+        if (observing)
+        {
+            float x,y;
+            NativeObserver::Position(x,y);
+            flight=NULL;
+            OTWDriver.SetOwnshipPosition(x,y,-8000.0f);
+            NativeObserver::Log("graphics-enter-start");
+            OTWDriver.Enter();
+            NativeObserver::Log("graphics-enter-done");
+            OTWDriver.BeginObserver(x,y);
+            SimDriver.Enter();
+            gRebuildBubbleNow=1;
+            NativeObserver::Log("camera-attached");
+        }
+        else
+#endif
         if (flight)
         {
             // JB 010616 CTD
@@ -799,21 +819,23 @@ void SimulationLoopControl::StartLoop(void)
             //FalconLocalSession, flight, FalconLocalSession->GetAircraftNum(),
             //FalconLocalSession->GetPilotSlot()
             //);
-            player = GameManager.FindPlayerVehicle(
-                flight, FalconLocalSession->GetAircraftNum());
-            FalconLocalSession->SetPlayerEntity(player);
+            if (!observing) {
+                player = GameManager.FindPlayerVehicle(
+                    flight, FalconLocalSession->GetAircraftNum());
+                FalconLocalSession->SetPlayerEntity(player);
+            }
             MonoPrint("Player %08x\n", player);
         }
 
         // Check if the player was successfully attached (They could have been killed in the meantime)
-        if (player and not player->IsDead())
+        if (observing || (player and not player->IsDead()))
         {
-            GameManager.AnnounceEntry();
+            if (!observing) GameManager.AnnounceEntry();
 #define START_GRAPHICS_WAIT_FOR_SIMDRIVE 1
 #if START_GRAPHICS_WAIT_FOR_SIMDRIVE
 
             // sfr: wait simDriver player entity
-            while (SimDriver.GetPlayerEntity() == NULL)
+            while (!observing && SimDriver.GetPlayerEntity() == NULL)
             {
                 Sleep(100);
             }
@@ -908,11 +930,11 @@ void SimulationLoopControl::StartLoop(void)
             // Wait until if all other relevant players are ready
             //MonoPrint("Waiting on other players...  %d\n",vuxRealTime);
 
-            FalconLocalSession->SetFlyState(FLYSTATE_WAITING);
+            FalconLocalSession->SetFlyState(observing ? FLYSTATE_FLYING : FLYSTATE_WAITING);
             FalconLocalSession->SetInitAceFactor(LogBook.AceFactor());
 
             // KCK: Start recording flight hours
-            RecordPlayerFlightStart();
+            if (!observing) RecordPlayerFlightStart();
 
             // FFV - The return to the 4rd "pie" is caused by a display of the fore buffer (pie #4)
             // after the last back buffer (pie #5).  Displaying Pie 5(#4) again fills both buffers with 5 (#4).
@@ -951,12 +973,19 @@ void SimulationLoopControl::StartLoop(void)
 
             // Dogfights have some special case start code -
             // i.e. For match play and instant entry
-            if (not SimDriver.RunningDogfight() or
-                SimDogfight.GetGameType() not_eq dog_TeamMatchplay)
+            if (!observing && (not SimDriver.RunningDogfight() or
+                SimDogfight.GetGameType() not_eq dog_TeamMatchplay))
             {
                 GameManager.ReleasePlayer(FalconLocalSession);
             }
 
+#ifdef FF_NATIVE_OBSERVER
+            if (observing) {
+                TheCampaign.Resume();
+                SetTimeCompression(1);
+                NativeObserver::Entered();
+            }
+#endif
             //sfr: im leaving only this one
             OTWDriver.RenderFirstFrame();
 
@@ -1036,7 +1065,8 @@ void SimulationLoopControl::StartLoop(void)
         MonoPrint("Detaching the player...\n");
 
         // Make sure to remove the player if we have one
-        GameManager.AnnounceExit();
+        if (!observing) GameManager.AnnounceExit();
+        else FalconLocalSession->SetFlyState(FLYSTATE_IN_UI);
         // Remove all active cameras
         vuLocalSessionEntity->ClearCameras();
 
@@ -1083,6 +1113,13 @@ void SimulationLoopControl::StartLoop(void)
         WaitForSingleObject(wait_for_graphics_cleanup, 0xFFFFFFFF);
 
         abortMission = endAbort;
+#ifdef FF_NATIVE_OBSERVER
+        if (observing) {
+            abortMission=FALSE;
+            NativeObserver::Finished();
+            SetTimeCompression(0);
+        }
+#endif
 
         // M.N. moved ACMI import after sim shutdown
         // Sim doesn't need to continue running when we import the ACMI

@@ -274,6 +274,7 @@ public:
     float GetMaxAAWeaponRange() const { return maxAAWpnRange; }
     int GetWeaponsAction() const { return int(mWeaponsAction); }
     bool IsReturningToBase() const { return mpActionFlags[AI_RTB]!=0; }
+    VU_ID GetAssignedTargetId() const { return mpActionFlags[AI_ENGAGE_TARGET] ? mDesignatedObject : FalconNullId; }
     bool SetReturnToBaseWaypoint(WayPointClass* waypoint);
     // Explicit observer/operator veto, independent of autonomous flight orders.
     bool IsOperatorWeaponsHold() const { return operatorWeaponsHold; }

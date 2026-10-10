@@ -66,6 +66,14 @@ int FalconWeaponsFire::Process(uchar autodisp)
 
 #ifdef FF_HEADLESS
     ++ff_headless::combat.weaponsFired;
+    ff_headless::CombatEvent event;
+    event.time=SimLibElapsedTime;
+    event.shooterCreator=dataBlock.fEntityID.creator_; event.shooterNumber=dataBlock.fEntityID.num_;
+    event.targetCreator=dataBlock.targetId.creator_; event.targetNumber=dataBlock.targetId.num_;
+    event.weaponCreator=dataBlock.fWeaponUID.creator_; event.weaponNumber=dataBlock.fWeaponUID.num_;
+    event.weaponType=dataBlock.fWeaponID;
+    event.fireCategory=int(dataBlock.weaponType);
+    ff_headless::combat.record(event);
 #endif
     theTarget = (FalconEntity*)vuDatabase->Find(dataBlock.targetId);
     theEntity = (FalconEntity*)(vuDatabase->Find(dataBlock.fEntityID));
@@ -78,7 +86,10 @@ int FalconWeaponsFire::Process(uchar autodisp)
 #ifdef FF_HEADLESS
             if(simEntity->IsAirplane()) ++ff_headless::combat.aircraftWeaponsFired;
             if(simEntity->IsHelicopter()) ++ff_headless::combat.helicopterWeaponsFired;
-            if(simEntity->GetDomain()==DOMAIN_SEA) ++ff_headless::combat.navalWeaponsFired;
+            if(simEntity->GetDomain()==DOMAIN_SEA) {
+                ++ff_headless::combat.navalWeaponsFired;
+                if(dataBlock.weaponType==GUN) ++ff_headless::combat.navalGunEvents;
+            }
 #endif
 
             if (simEntity and not simEntity->IsLocal() and

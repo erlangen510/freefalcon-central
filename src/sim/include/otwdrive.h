@@ -560,6 +560,11 @@ public:
         otwResolution = newRes;
     };
     void ToggleActionCamera(void);
+#ifdef FF_NATIVE_OBSERVER
+    void BeginObserver(float x, float y);
+    void DrawObserverOverlay();
+    void UpdateObserverCamera(float dT);
+#endif
     void RunActionCamera(void);
     void ToggleThrustReverseDisplay(void); //Cobra
 

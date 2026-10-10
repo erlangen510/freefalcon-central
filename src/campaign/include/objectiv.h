@@ -88,6 +88,22 @@ struct CampObjectiveLinkDataType
     VU_ID id;
 };
 
+// Per-objective feature placement (wargame headless fork): replaces the class
+// template's offset (feet; x east, y north) and facing (degrees) of one feature
+// for one objective. Arrays are owned by headless/objective_layout.cpp.
+struct ObjectiveFeaturePlacement
+{
+    float x, y, z;
+    short facing;
+};
+
+// Per-objective point list transform (same fork): point offsets of the class are rotated by
+// (cos, sin), clockwise from north, then shifted by (x east, y north) feet. See TranslatePointData.
+struct ObjectivePointTransform
+{
+    float cos, sin, x, y;
+};
+
 class ObjectiveClass : public CampBaseClass
 {
 #ifdef USE_SH_POOLS
@@ -122,6 +138,9 @@ public:
     CampObjectiveLinkDataType*
         link_data; // The actual link data (was [OBJ_MAX_NEIGHBORS])
     ATCBrain* brain;
+    // Site layout: one placement per class feature, or NULL for the class template.
+    const ObjectiveFeaturePlacement* feature_layout;
+    const ObjectivePointTransform* point_transform;
 
 public:
     // access functions
@@ -467,6 +486,7 @@ public:
     int GetFeatureRepairTime(int f);
     int GetFeatureID(int f);
     int GetFeatureOffset(int f, float* x, float* y, float* z);
+    int GetFeatureFacing(int f);
     ObjClassDataType* GetObjectiveClassData(void);
     char* GetObjectiveClassName(void);
     // int RoE (VuEntity* e, int type);

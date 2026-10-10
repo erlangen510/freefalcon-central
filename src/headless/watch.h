@@ -1,6 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <chrono>
+void SaveAggregateCheckpoint(const std::filesystem::path& directory);
 
 // Local observer transport. Only the campaign thread reads model state.
 class CampaignWatch {
@@ -20,11 +21,17 @@ private:
     unsigned long long sequence = 0, requestedSteps = 0, consumedSteps = 0, frame = 0;
     unsigned long long actionSequence = 0;
     std::string actionStatus = "idle";
+    unsigned long long saveSequence=0;
+    std::string saveStatus="idle",saveError,savePath;
+    unsigned long long commanderSequence=0;
+    std::string commanderStatus="idle";
     int speed = 1;
     bool paused = true, stopping = false;
     bool regionActive = false;
     double regionX = 0, regionY = 0, regionRadius = 10;
     void command();
     void unitAction();
+    void saveCommand();
+    void commanderCommand();
     void write(const char* name, const std::string& contents);
 };

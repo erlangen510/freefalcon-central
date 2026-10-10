@@ -2367,6 +2367,16 @@ void AirframeClass::AllocateFuel(float totalfuel)
 }
 
 // what fuel do we have available (resevoirs only)
+#ifdef FF_DETAILED_ENGINE
+void AirframeClass::RestoreRemainingFuel(float totalfuel)
+{
+    const float previous=fuel+externalFuel;
+    AllocateFuel(totalfuel);
+    const float delta=fuel+externalFuel-previous;
+    weight+=delta;
+    mass+=delta/GRAVITY;
+}
+#endif
 float AirframeClass::AvailableFuel()
 {
     if (not g_bRealisticAvionics)

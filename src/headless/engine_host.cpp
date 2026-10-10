@@ -24,11 +24,18 @@
 #include <map>
 #include <set>
 #include <fstream>
+#include <sstream>
 #include <memory>
 #include "watch.h"
 #include "detailed.h"
+#include "commander.h"
+#include "theater_remap.h"
+#include "objective_rebuild.h"
+#include "objective_layout.h"
+#include "objectiv.h"
 #include <random>
 
+extern short Map_Max_X, Map_Max_Y;
 static std::mt19937 detailedRandom;
 long HeadlessFastRandom() { return static_cast<long>(detailedRandom()); }
 
@@ -42,8 +49,15 @@ int HeadlessTraceRandom(int value, const char* file, int line) {
     return value;
 }
 
-struct UnitState { short x, y; int vehicles, supply, orders; bool flight, local; };
+struct UnitState { short x, y; int vehicles, supply, orders, liveVehicles; bool flight, local, dead; };
 using UnitStates = std::map<unsigned long long, UnitState>;
+static int liveVehicleCount(Unit unit) {
+    if(unit->IsDead()) return 0;
+    if(!unit->Father()) return unit->GetTotalVehicles();
+    int count=0;
+    for(int i=0;Unit child=unit->GetUnitElement(i);++i) count+=liveVehicleCount(child);
+    return count;
+}
 static UnitStates captureUnits() {
     UnitStates result;
     VuListIterator it(AllUnitList);
@@ -52,9 +66,29 @@ static UnitStates captureUnits() {
         UnitState state{}; u->GetLocation(&state.x, &state.y);
         state.vehicles = u->GetTotalVehicles(); state.supply = u->GetUnitSupply(); state.orders = u->GetUnitOrders();
         state.flight = u->IsFlight(); state.local = u->IsLocal();
+        state.dead=u->IsDead();
+        state.liveVehicles=liveVehicleCount(u);
         result.emplace((static_cast<unsigned long long>(u->Id().creator_) << 32) | u->Id().num_, state);
     }
     return result;
+}
+static unsigned long long unitStateHash(const UnitStates& units) {
+    unsigned long long hash=14695981039346656037ull;
+    for(const auto& [id,s]:units) {
+        for(auto value:{id,static_cast<unsigned long long>(s.x),static_cast<unsigned long long>(s.y),
+            static_cast<unsigned long long>(s.vehicles),static_cast<unsigned long long>(s.supply),static_cast<unsigned long long>(s.orders)}) {
+            for(int i=0;i<8;++i) {hash^=(value>>(i*8))&255;hash*=1099511628211ull;}
+        }
+    }
+    return hash;
+}
+static std::string unitStateJson(const UnitStates& units) {
+    std::ostringstream out;out<<'[';bool comma=false;
+    for(const auto& [id,s]:units) {
+        if(comma)out<<',';comma=true;
+        out<<"[\""<<id<<"\","<<s.x<<','<<s.y<<','<<s.vehicles<<','<<s.supply<<','<<s.orders<<','<<s.liveVehicles<<','<<(s.dead?"true":"false")<<']';
+    }
+    out<<']';return out.str();
 }
 
 extern void DoCampaignLoop(int);
@@ -73,6 +107,30 @@ static void setPath(char* target, const std::filesystem::path& path) {
     if (strchr(target, '%')) throw std::runtime_error("Legacy engine paths cannot contain percent characters");
 }
 static void stage(const char* text) { std::cerr << "[headless] " << text << std::endl; }
+void SaveAggregateCheckpoint(const std::filesystem::path& directory) {
+    if(DetailedRegionActive()) throw std::runtime_error("Checkpoint requires fully aggregated campaign state");
+    captureUnits();
+    char archivePath[MAX_PATH];setPath(archivePath,directory/"checkpoint.cam");
+    if(std::filesystem::exists(directory)) throw std::runtime_error("Checkpoint output directory already exists");
+    std::filesystem::create_directories(directory.parent_path());
+    if(!std::filesystem::create_directory(directory)) throw std::runtime_error("Checkpoint output directory already exists");
+    const std::string oldDirectory=FalconCampUserSaveDirectory,oldScenario=TheCampaign.Scenario,oldSave=TheCampaign.SaveFile;
+    try {
+        setPath(FalconCampUserSaveDirectory,directory);
+        char name[]="checkpoint";
+        if(!TheCampaign.SaveCampaign(game_Campaign,name,1)) throw std::runtime_error("Native campaign save failed");
+        const auto saved=ff::headless::InspectScenario(directory/"checkpoint.cam");
+        if(saved.time_ms!=TheCampaign.CurrentTime) throw std::runtime_error("Saved campaign time mismatch");
+        SaveDetailedBoundaryCheckpoint(directory);
+        SaveCommanderCheckpoint(directory);
+        SaveObjectiveLayouts(directory/"checkpoint.lay");
+    } catch(...) {
+        EndWriteCampFile();
+        strcpy(FalconCampUserSaveDirectory,oldDirectory.c_str());strcpy(TheCampaign.Scenario,oldScenario.c_str());strcpy(TheCampaign.SaveFile,oldSave.c_str());
+        throw;
+    }
+    strcpy(FalconCampUserSaveDirectory,oldDirectory.c_str());strcpy(TheCampaign.Scenario,oldScenario.c_str());strcpy(TheCampaign.SaveFile,oldSave.c_str());
+}
 
 static void requireFile(const std::filesystem::path& file) {
     if (!std::filesystem::is_regular_file(file) || !std::filesystem::file_size(file))
@@ -109,6 +167,9 @@ static void validateData(const std::filesystem::path& data) {
 }
 
 int RunLegacyCampaign(const std::vector<std::string>& args) {
+    // CampaignThread and SimLoop normally configure this per-thread. The
+    // headless host replaces both loops and must preserve their numeric mode.
+    _controlfp(_RC_CHOP, MCW_RC);
     unsigned completedSteps = 0;
     CampaignTime loadedTime = 0;
     bool campaignLoaded = false;
@@ -116,25 +177,40 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
     try {
         if (args.size() != 5 && args.size() != 6) { std::cerr << "{\"status\":\"error\",\"simulation_advanced\":false,\"error\":\"Usage: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\"}\n"; return 2; }
         const auto data = std::filesystem::absolute(std::filesystem::u8path(args[2]));
-        const bool interactive = args[1] == "watch";
+        const bool exportMap = args[1] == "export-map";
+        const bool interactive = args[1] == "watch" || args[1] == "watch-resume" || exportMap;
         if (interactive) watch = std::make_unique<CampaignWatch>(std::filesystem::absolute(std::filesystem::u8path(args[4])));
         const auto wallStart = std::chrono::steady_clock::now();
         size_t parsed = 0;
-        const bool diagnostic = args[1] == "detail-test";
-        const int minutes = interactive ? 10080 : diagnostic ? 1 : std::stoi(args[4], &parsed);
-        if (!interactive && !diagnostic && parsed != args[4].size()) throw std::runtime_error("Invalid duration");
+        const bool damageCheckpoint=args[1]=="damage-checkpoint-test" || args[1]=="fault-checkpoint-test";
+        const bool diagnostic = args[1] == "detail-test" || damageCheckpoint;
+        const bool checkpoint=args[1]=="checkpoint" || damageCheckpoint, resume=args[1]=="resume" || args[1]=="watch-resume";
+        // remap-theater <data-root> <scenario> <remap.txt> <new-output-directory>
+        // rebuild-objectives <data-root> <scenario> <objectives.txt> <new-output-directory>
+        const bool rebuild=args[1]=="rebuild-objectives";
+        const bool remap=args[1]=="remap-theater" || rebuild;
+        if(remap && args.size()!=6) throw std::runtime_error("Usage: ff-campaign " + args[1] + " <data-root> <scenario-name> <plan-file> <new-output-directory>");
+        const auto checkpointDirectory=(checkpoint||resume)?std::filesystem::absolute(std::filesystem::u8path(args[checkpoint?4:3])):remap?std::filesystem::absolute(std::filesystem::u8path(args[5])):std::filesystem::path();
+        if(checkpoint||resume) {
+            char archivePath[MAX_PATH];
+            setPath(archivePath,checkpointDirectory / "checkpoint.cam");
+        }
+        if((checkpoint||remap) && std::filesystem::exists(checkpointDirectory)) throw std::runtime_error("Checkpoint output directory must not already exist");
+        const int minutes = interactive ? 10080 : (diagnostic||checkpoint||remap) ? 1 : std::stoi(args[4], &parsed);
+        if (!interactive && !diagnostic && !checkpoint && !remap && parsed != args[4].size()) throw std::runtime_error("Invalid duration");
         unsigned seed = 1;
-        if (args.size() == 6) {
+        if (args.size() == 6 && !remap) {
             const auto value = std::stoull(args[5], &parsed);
             if (parsed != args[5].size() || value > UINT_MAX || args[5][0] == '-') throw std::runtime_error("Invalid seed");
             seed = static_cast<unsigned>(value);
         }
         if (minutes < 1 || minutes > 10080) throw std::runtime_error("Duration must be 1..10080 minutes");
         char scenario[64];
-        if (args[3].empty() || args[3].size() >= sizeof(scenario)) throw std::runtime_error("Invalid scenario name");
-        strcpy(scenario, args[3].c_str());
+        const auto scenarioName=resume?std::string("checkpoint"):args[3];
+        if (scenarioName.empty() || scenarioName.size() >= sizeof(scenario)) throw std::runtime_error("Invalid scenario name");
+        strcpy(scenario, scenarioName.c_str());
         if (strspn(scenario, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != strlen(scenario)) throw std::runtime_error("Use a scenario basename, such as save0");
-        const auto inspected = ff::headless::InspectScenario(data / "campaign/SAVE" / (std::string(scenario) + ".cam"));
+        const auto inspected = ff::headless::InspectScenario((resume?checkpointDirectory:data / "campaign/SAVE") / (std::string(scenario) + ".cam"));
         validateData(data);
         // Native history files share this data root. The handle lives until exit.
         HANDLE dataLock = CreateFileW((data / ".headless.lock").c_str(), GENERIC_READ | GENERIC_WRITE,
@@ -142,7 +218,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         if (dataLock == INVALID_HANDLE_VALUE) throw std::runtime_error("Data root is in use by another campaign process");
         setPath(FalconDataDirectory, data);
         setPath(FalconCampaignSaveDirectory, data / "campaign/SAVE");
-        setPath(FalconCampUserSaveDirectory, data / "campaign/SAVE");
+        setPath(FalconCampUserSaveDirectory, resume?checkpointDirectory:data / "campaign/SAVE");
         setPath(FalconObjectDataDir, data / "terrdata/objects");
         setPath(FalconTerrainDataDir, data / "terrdata/korea");
         std::filesystem::current_path(data);
@@ -172,6 +248,9 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         ReadAllMissileData();
         stage("load campaign entities");
         if (!TheCampaign.LoadCampaign(game_Campaign, scenario)) throw std::runtime_error("Campaign load failed");
+        if(resume) { LoadDetailedBoundaryCheckpoint(checkpointDirectory); LoadCommanderCheckpoint(checkpointDirectory); }
+        // Site layouts are saved next to the scenario (<scenario>.lay); none means class templates.
+        const int siteLayouts = LoadObjectiveLayouts((resume?checkpointDirectory:data / "campaign/SAVE") / (std::string(scenario) + ".lay"));
         TheCampaign.Flags |= CAMP_RUNNING;
         for (int t = 0; t < NUM_TEAMS; ++t) {
             if (!TeamInfo[t] || !TeamInfo[t]->atm || !TeamInfo[t]->gtm || !TeamInfo[t]->ntm)
@@ -180,17 +259,59 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         int unitCount = 0, objectiveCount = 0;
         { VuListIterator it(AllUnitList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) ++unitCount; }
         { VuListIterator it(AllObjList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) ++objectiveCount; }
-        fprintf(stderr, "loaded units=%d objectives=%d theater=%s scenario=%s time=%lu\n", unitCount, objectiveCount, TheCampaign.TheaterName, TheCampaign.Scenario, TheCampaign.CurrentTime);
+        fprintf(stderr, "loaded units=%d objectives=%d site_layouts=%d theater=%s scenario=%s time=%lu\n", unitCount, objectiveCount, siteLayouts,TheCampaign.TheaterName, TheCampaign.Scenario, TheCampaign.CurrentTime);
+        if (rebuild) {
+            // Replace the objective set from an open-data plan and save before any planning.
+            // Plan key -> objective id, for the viewer; moved into the checkpoint once it exists.
+            auto keys = checkpointDirectory;
+            keys += ".objective-keys.tmp";
+            const auto r = RebuildObjectives(std::filesystem::absolute(std::filesystem::u8path(args[4])), keys);
+            SaveAggregateCheckpoint(checkpointDirectory);
+            std::filesystem::rename(keys, checkpointDirectory / "objective-keys.txt");
+            int objectiveTotal = 0;
+            { VuListIterator it(AllObjList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) ++objectiveTotal; }
+            std::cout << "{\"status\":\"ok\",\"objectives\":" << objectiveTotal << ",\"kept\":" << r.kept << ",\"modified\":" << r.modified
+                      << ",\"created\":" << r.created << ",\"dropped\":" << r.dropped << ",\"class_changes\":" << r.class_changes
+                      << ",\"links\":" << r.links << ",\"unreachable_links\":" << r.unreachable_links
+                      << ",\"ground_impassable_links\":" << r.ground_impassable_links << ",\"radar_sites\":" << r.radar_sites
+                      << ",\"unit_refs\":" << r.unit_refs << ",\"squadrons\":" << r.squadrons << ",\"primaries\":" << r.primaries
+                      << ",\"secondaries\":" << r.secondaries << ",\"flag_mismatches\":" << r.flag_mismatches
+                      << ",\"site_layouts\":" << ObjectiveLayoutCount() << "}" << std::endl;
+            std::cout.flush(); std::cerr.flush(); std::_Exit(0);
+        }
+        if (remap) {
+            // Relocate onto the regenerated grid and save before any planning.
+            const auto moved = RemapTheater(std::filesystem::absolute(std::filesystem::u8path(args[4])));
+            SaveAggregateCheckpoint(checkpointDirectory);
+            std::cout << "{\"status\":\"ok\",\"objectives\":" << moved.objectives << ",\"units\":" << moved.units
+                      << ",\"parents\":" << moved.parents << ",\"missing\":" << moved.missing << ",\"links\":" << moved.links
+                      << ",\"unreachable_links\":" << moved.unreachable_links << ",\"ground_impassable_links\":" << moved.ground_impassable_links << ",\"theater\":[" << Map_Max_X << ',' << Map_Max_Y << "]}" << std::endl;
+            std::cout.flush(); std::cerr.flush(); std::_Exit(0);
+        }
         const CampaignTime start = TheCampaign.CurrentTime;
         loadedTime = start; campaignLoaded = true;
         const auto before = captureUnits();
+        // Objective owners at the start, to report captures (ownership changes).
+        std::map<VU_ID,int> startOwners;
+        { VuListIterator it(AllObjList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) startOwners[e->Id()] = static_cast<ObjectiveClass*>(e)->GetOwner(); }
         auto previous = before;
         std::set<unsigned long long> moved, createdFlights, strengthChanged, supplyChanged, ordersChanged;
         stage("startup campaign planning");
 #ifdef FF_DETAILED_ENGINE
-        if (diagnostic) { RunDetailedDiagnostic(args[4]); std::cout.flush(); std::cerr.flush(); std::_Exit(0); }
+        if (diagnostic) {
+            RunDetailedDiagnostic(damageCheckpoint?(args[1]=="fault-checkpoint-test"?"air-fault-checkpoint":"air-damage-checkpoint"):args[4]);
+            if(damageCheckpoint) SaveAggregateCheckpoint(checkpointDirectory);
+            std::cout.flush(); std::cerr.flush(); std::_Exit(0);
+        }
 #endif
-        DoCampaignLoop(1);
+        if (exportMap) {
+            // Map viewer export: the scenario exactly as loaded, before startup
+            // planning or any campaign time.
+            watch->initialize(scenario);
+            watch->publish("snapshot");
+            std::cout.flush(); std::cerr.flush(); std::_Exit(0);
+        }
+        if(!resume) DoCampaignLoop(1);
         if (watch) watch->initialize(scenario);
         CampaignTime nextCampaignTick = start + 5000;
         for (int second = 0; second < minutes * 60;) {
@@ -218,9 +339,17 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
             ++completedSteps;
         }
         if (watch) watch->publish("stopped");
+        UnitStates savedUnits;
+        if(checkpoint) {
+            SaveAggregateCheckpoint(checkpointDirectory);
+            savedUnits=captureUnits();
+        }
         int local = 0, flights = 0;
         for (const auto& [id, state] : previous) { local += state.local; flights += state.flight; }
-        std::cout << "{\"status\":\"ok\",\"simulation_advanced\":" << (completedSteps ? "true" : "false") << ",\"start_ms\":" << start
+        std::cout << "{";
+        if(checkpoint) std::cout<<"\"saved_unit_states\":"<<unitStateJson(savedUnits)<<',';
+        if(checkpoint||resume) std::cout<<"\"initial_unit_states\":"<<unitStateJson(before)<<",\"final_unit_states\":"<<unitStateJson(previous)<<',';
+        std::cout << "\"status\":\"ok\",\"simulation_advanced\":" << (completedSteps ? "true" : "false") << ",\"start_ms\":" << start
                   << ",\"end_ms\":" << TheCampaign.CurrentTime
                   << ",\"scenario\":" << ff::headless::JsonString(scenario)
                   << ",\"seed\":" << seed << ",\"format_version\":" << inspected.version
@@ -228,8 +357,20 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
                   << ",\"all_units_aggregate\":" << (DetailedRegionActive() ? "false" : "true")
                   << ",\"objectives\":" << objectiveCount
                   << ",\"units_before\":" << before.size() << ",\"units_after\":" << previous.size()
+                  << ",\"initial_unit_state_hash\":\""<<unitStateHash(before)<<"\",\"final_unit_state_hash\":\""<<unitStateHash(previous)<<"\""
                   << ",\"local_units\":" << local << ",\"flights_after\":" << flights
                   << ",\"moved_units\":" << moved.size() << ",\"created_flights\":" << createdFlights.size()
+                  << [&] {
+                         // Captures: objectives whose owner differs from the start of this run.
+                         std::ostringstream ids; int n = 0;
+                         VuListIterator it(AllObjList);
+                         for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) {
+                             auto o = startOwners.find(e->Id());
+                             if (o == startOwners.end() || o->second == static_cast<ObjectiveClass*>(e)->GetOwner()) continue;
+                             ids << (n++ ? "," : "") << '"' << e->Id().creator_ << ':' << e->Id().num_ << '"';
+                         }
+                         return ",\"captured_objectives\":" + std::to_string(n) + ",\"captured_ids\":[" + ids.str() + "]";
+                     }()
                   << ",\"strength_changed_units\":" << strengthChanged.size()
                   << ",\"supply_changed_units\":" << supplyChanged.size()
                   << ",\"orders_changed_units\":" << ordersChanged.size()
