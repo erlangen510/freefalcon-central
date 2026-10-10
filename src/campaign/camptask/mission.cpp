@@ -128,6 +128,13 @@ int MissionRequestClass::RequestMission(void)
 
         if (priority > 0)
         {
+#ifdef FF_HEADLESS
+            // FF_AIR_TRACE=1: one stderr line per posted request (headless diagnostics; reads state only).
+            static const bool traceAir = getenv("FF_AIR_TRACE") != nullptr;
+            if (traceAir)
+                fprintf(stderr, "[request] %lu team %d mission %d at %d,%d target %lu:%lu priority %d\n", TheCampaign.CurrentTime,
+                        (int)who, (int)mission, tx, ty, targetID.creator_, targetID.num_, (int)priority);
+#endif
             FalconSendMessage(
                 message,
                 FALSE); // KCK NOTE: Go ahead and let a few messages miss their target

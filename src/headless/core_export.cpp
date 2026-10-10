@@ -18,6 +18,9 @@
 #include "feature.h"
 #include "vehicle.h"
 #include "team.h"
+#include "atm.h"
+#include "mission.h"
+#include "pilot.h"
 #include "gtm.h"
 #include "gtmobj.h"
 #include "tactics.h"
@@ -42,6 +45,87 @@ extern short CE_Events;
 extern SquadronStoresDataType* SquadronStoresDataTable;
 extern bool g_bPowerGrid;
 extern int g_nNoPlayerPlay;
+
+extern short NumSquadTypes;
+
+// Falcon4.AII inputs defined in aiinput.cpp that no header declares here.
+extern short IMMEDIATE_MIN_TIME;
+extern short IMMEDIATE_MAX_TIME;
+extern short LONGRANGE_MIN_TIME;
+extern short LONGRANGE_MAX_TIME;
+extern short ATM_ASSIGN_RATIO;
+extern short MAX_FLYMISSION_THREAT;
+extern short MAX_FLYMISSION_HIGHTHREAT;
+extern short MAX_FLYMISSION_NOTHREAT;
+extern short MIN_SEADESCORT_THREAT;
+extern short MIN_AVOID_THREAT;
+extern short MIN_AP_DISTANCE;
+extern short BREAKPOINT_DISTANCE;
+extern short ATM_TARGET_CLEAR_RADIUS;
+extern short LOITER_DIST;
+extern short SWEEP_DISTANCE;
+extern short MINIMUM_BDA_PRIORITY;
+extern short MINIMUM_AWACS_DISTANCE;
+extern short MAXIMUM_AWACS_DISTANCE;
+extern short MINIMUM_JSTAR_DISTANCE;
+extern short MAXIMUM_JSTAR_DISTANCE;
+extern short MINIMUM_TANKER_DISTANCE;
+extern short MAXIMUM_TANKER_DISTANCE;
+extern short MINIMUM_ECM_DISTANCE;
+extern short MAXIMUM_ECM_DISTANCE;
+extern short FIRST_COLONEL;
+extern short FIRST_COMMANDER;
+extern short FIRST_WINGMAN;
+extern short LAST_WINGMAN;
+extern short MAX_AA_STR_FOR_ESCORT;
+extern short ONCALL_CAS_FLIGHTS_PER_REQUEST;
+extern short MIN_TASK_AIR;
+extern short MIN_PLAN_AIR;
+extern short VICTORY_CHECK_TIME;
+extern short FLIGHT_COMBAT_CHECK_INTERVAL;
+extern short AIR_UPDATE_CHECK_INTERVAL;
+extern short FLIGHT_COMBAT_RATE;
+extern short PACKAGE_CYCLES_TO_WAIT;
+extern short AIR_PATH_MAX;
+extern float MIN_IGNORE_RANGE;
+extern short MAX_SAR_DIST;
+extern long PILOT_ASSIGN_TIME;
+extern short AIRCRAFT_TURNAROUND_TIME_MINUTES;
+extern short MAX_OFFENSES;
+extern short MIN_OFFENSIVE_UNITS;
+extern short MINIMUM_ADJUSTED_LEVEL;
+extern short MINIMUM_VIABLE_LEVEL;
+extern short MAX_ASSIGNMENT_DIST;
+extern short BRIGADE_BREAK_BASE;
+extern short ROLE_SCORE_MODIFIER;
+extern short MIN_REPAIR_OBJECTIVES;
+extern short MINIMUM_EXP_TO_FIRE_PREGUIDE;
+extern short MIN_TASK_NAVAL;
+extern short MIN_PLAN_NAVAL;
+extern short NAVAL_COMBAT_CHECK_INTERVAL;
+extern short NAVAL_COMBAT_RATE;
+extern short LOW_ALTITUDE_CUTOFF;
+extern short NEW_CLOUD_CHANCE;
+extern short DEL_CLOUD_CHANCE;
+extern short PLAYER_BUBBLE_MOVERS;
+extern short FALCON_PLAYER_TEAM;
+extern short CAMP_RESYNC_TIME;
+extern short STANDARD_EVENT_LENGTH;
+extern short PRIORITY_EVENT_LENGTH;
+extern float REAGREGATION_RATIO;
+extern float SIM_BUBBLE_SIZE;
+extern int F4_GENERIC_US_TRUCK_TYPE_SMALL;
+extern int F4_GENERIC_US_TRUCK_TYPE_LARGE;
+extern int F4_GENERIC_US_TRUCK_TYPE_TRAILER;
+extern int F4_GENERIC_OPFOR_TRUCK_TYPE_SMALL;
+extern int F4_GENERIC_OPFOR_TRUCK_TYPE_LARGE;
+extern int F4_GENERIC_OPFOR_TRUCK_TYPE_TRAILER;
+extern int SWITCH_TRACTORS_IN_TE;
+extern float MIN_DEAD_PCT;
+extern float FLOTDrawDistance;
+extern int FLOTSortDirection;
+extern int TheaterXPosition;
+extern int TheaterYPosition;
 
 namespace {
 
@@ -118,6 +202,84 @@ void constants(std::ostream& out) {
         {"HitChanceAir", HitChanceAir}, {"HitChanceGround", HitChanceGround}, {"PowerGrid", g_bPowerGrid ? 1 : 0}, {"NoPlayerPlay", g_nNoPlayerPlay},
         {"LOWAIR_RANGE_MODIFIER", LOWAIR_RANGE_MODIFIER}, {"DayZero", static_cast<double>(TheCampaign.DayZero)},
         {"CampaignEnemyGroundExperience", static_cast<double>(PlayerOptions.CampaignEnemyGroundExperience())},
+            // The remaining Falcon4.AII inputs (aiinput.cpp).
+        {"IMMEDIATE_MIN_TIME", static_cast<double>(IMMEDIATE_MIN_TIME)},
+        {"IMMEDIATE_MAX_TIME", static_cast<double>(IMMEDIATE_MAX_TIME)},
+        {"LONGRANGE_MIN_TIME", static_cast<double>(LONGRANGE_MIN_TIME)},
+        {"LONGRANGE_MAX_TIME", static_cast<double>(LONGRANGE_MAX_TIME)},
+        {"ATM_ASSIGN_RATIO", static_cast<double>(ATM_ASSIGN_RATIO)},
+        {"MAX_FLYMISSION_THREAT", static_cast<double>(MAX_FLYMISSION_THREAT)},
+        {"MAX_FLYMISSION_HIGHTHREAT", static_cast<double>(MAX_FLYMISSION_HIGHTHREAT)},
+        {"MAX_FLYMISSION_NOTHREAT", static_cast<double>(MAX_FLYMISSION_NOTHREAT)},
+        {"MIN_SEADESCORT_THREAT", static_cast<double>(MIN_SEADESCORT_THREAT)},
+        {"MIN_AVOID_THREAT", static_cast<double>(MIN_AVOID_THREAT)},
+        {"MIN_AP_DISTANCE", static_cast<double>(MIN_AP_DISTANCE)},
+        {"BREAKPOINT_DISTANCE", static_cast<double>(BREAKPOINT_DISTANCE)},
+        {"ATM_TARGET_CLEAR_RADIUS", static_cast<double>(ATM_TARGET_CLEAR_RADIUS)},
+        {"LOITER_DIST", static_cast<double>(LOITER_DIST)},
+        {"SWEEP_DISTANCE", static_cast<double>(SWEEP_DISTANCE)},
+        {"MINIMUM_BDA_PRIORITY", static_cast<double>(MINIMUM_BDA_PRIORITY)},
+        {"MINIMUM_AWACS_DISTANCE", static_cast<double>(MINIMUM_AWACS_DISTANCE)},
+        {"MAXIMUM_AWACS_DISTANCE", static_cast<double>(MAXIMUM_AWACS_DISTANCE)},
+        {"MINIMUM_JSTAR_DISTANCE", static_cast<double>(MINIMUM_JSTAR_DISTANCE)},
+        {"MAXIMUM_JSTAR_DISTANCE", static_cast<double>(MAXIMUM_JSTAR_DISTANCE)},
+        {"MINIMUM_TANKER_DISTANCE", static_cast<double>(MINIMUM_TANKER_DISTANCE)},
+        {"MAXIMUM_TANKER_DISTANCE", static_cast<double>(MAXIMUM_TANKER_DISTANCE)},
+        {"MINIMUM_ECM_DISTANCE", static_cast<double>(MINIMUM_ECM_DISTANCE)},
+        {"MAXIMUM_ECM_DISTANCE", static_cast<double>(MAXIMUM_ECM_DISTANCE)},
+        {"FIRST_COLONEL", static_cast<double>(FIRST_COLONEL)},
+        {"FIRST_COMMANDER", static_cast<double>(FIRST_COMMANDER)},
+        {"FIRST_WINGMAN", static_cast<double>(FIRST_WINGMAN)},
+        {"LAST_WINGMAN", static_cast<double>(LAST_WINGMAN)},
+        {"MAX_AA_STR_FOR_ESCORT", static_cast<double>(MAX_AA_STR_FOR_ESCORT)},
+        {"ONCALL_CAS_FLIGHTS_PER_REQUEST", static_cast<double>(ONCALL_CAS_FLIGHTS_PER_REQUEST)},
+        {"MIN_TASK_AIR", static_cast<double>(MIN_TASK_AIR)},
+        {"MIN_PLAN_AIR", static_cast<double>(MIN_PLAN_AIR)},
+        {"VICTORY_CHECK_TIME", static_cast<double>(VICTORY_CHECK_TIME)},
+        {"FLIGHT_COMBAT_CHECK_INTERVAL", static_cast<double>(FLIGHT_COMBAT_CHECK_INTERVAL)},
+        {"AIR_UPDATE_CHECK_INTERVAL", static_cast<double>(AIR_UPDATE_CHECK_INTERVAL)},
+        {"FLIGHT_COMBAT_RATE", static_cast<double>(FLIGHT_COMBAT_RATE)},
+        {"PACKAGE_CYCLES_TO_WAIT", static_cast<double>(PACKAGE_CYCLES_TO_WAIT)},
+        {"AIR_PATH_MAX", static_cast<double>(AIR_PATH_MAX)},
+        {"MIN_IGNORE_RANGE", static_cast<double>(MIN_IGNORE_RANGE)},
+        {"MAX_SAR_DIST", static_cast<double>(MAX_SAR_DIST)},
+        {"PILOT_ASSIGN_TIME", static_cast<double>(PILOT_ASSIGN_TIME)},
+        {"AIRCRAFT_TURNAROUND_TIME_MINUTES", static_cast<double>(AIRCRAFT_TURNAROUND_TIME_MINUTES)},
+        {"MAX_OFFENSES", static_cast<double>(MAX_OFFENSES)},
+        {"MIN_OFFENSIVE_UNITS", static_cast<double>(MIN_OFFENSIVE_UNITS)},
+        {"MINIMUM_ADJUSTED_LEVEL", static_cast<double>(MINIMUM_ADJUSTED_LEVEL)},
+        {"MINIMUM_VIABLE_LEVEL", static_cast<double>(MINIMUM_VIABLE_LEVEL)},
+        {"MAX_ASSIGNMENT_DIST", static_cast<double>(MAX_ASSIGNMENT_DIST)},
+        {"BRIGADE_BREAK_BASE", static_cast<double>(BRIGADE_BREAK_BASE)},
+        {"ROLE_SCORE_MODIFIER", static_cast<double>(ROLE_SCORE_MODIFIER)},
+        {"MIN_REPAIR_OBJECTIVES", static_cast<double>(MIN_REPAIR_OBJECTIVES)},
+        {"MINIMUM_EXP_TO_FIRE_PREGUIDE", static_cast<double>(MINIMUM_EXP_TO_FIRE_PREGUIDE)},
+        {"MIN_TASK_NAVAL", static_cast<double>(MIN_TASK_NAVAL)},
+        {"MIN_PLAN_NAVAL", static_cast<double>(MIN_PLAN_NAVAL)},
+        {"NAVAL_COMBAT_CHECK_INTERVAL", static_cast<double>(NAVAL_COMBAT_CHECK_INTERVAL)},
+        {"NAVAL_COMBAT_RATE", static_cast<double>(NAVAL_COMBAT_RATE)},
+        {"LOW_ALTITUDE_CUTOFF", static_cast<double>(LOW_ALTITUDE_CUTOFF)},
+        {"NEW_CLOUD_CHANCE", static_cast<double>(NEW_CLOUD_CHANCE)},
+        {"DEL_CLOUD_CHANCE", static_cast<double>(DEL_CLOUD_CHANCE)},
+        {"PLAYER_BUBBLE_MOVERS", static_cast<double>(PLAYER_BUBBLE_MOVERS)},
+        {"FALCON_PLAYER_TEAM", static_cast<double>(FALCON_PLAYER_TEAM)},
+        {"CAMP_RESYNC_TIME", static_cast<double>(CAMP_RESYNC_TIME)},
+        {"STANDARD_EVENT_LENGTH", static_cast<double>(STANDARD_EVENT_LENGTH)},
+        {"PRIORITY_EVENT_LENGTH", static_cast<double>(PRIORITY_EVENT_LENGTH)},
+        {"REAGREGATION_RATIO", static_cast<double>(REAGREGATION_RATIO)},
+        {"SIM_BUBBLE_SIZE", static_cast<double>(SIM_BUBBLE_SIZE)},
+        {"F4_GENERIC_US_TRUCK_TYPE_SMALL", static_cast<double>(F4_GENERIC_US_TRUCK_TYPE_SMALL)},
+        {"F4_GENERIC_US_TRUCK_TYPE_LARGE", static_cast<double>(F4_GENERIC_US_TRUCK_TYPE_LARGE)},
+        {"F4_GENERIC_US_TRUCK_TYPE_TRAILER", static_cast<double>(F4_GENERIC_US_TRUCK_TYPE_TRAILER)},
+        {"F4_GENERIC_OPFOR_TRUCK_TYPE_SMALL", static_cast<double>(F4_GENERIC_OPFOR_TRUCK_TYPE_SMALL)},
+        {"F4_GENERIC_OPFOR_TRUCK_TYPE_LARGE", static_cast<double>(F4_GENERIC_OPFOR_TRUCK_TYPE_LARGE)},
+        {"F4_GENERIC_OPFOR_TRUCK_TYPE_TRAILER", static_cast<double>(F4_GENERIC_OPFOR_TRUCK_TYPE_TRAILER)},
+        {"SWITCH_TRACTORS_IN_TE", static_cast<double>(SWITCH_TRACTORS_IN_TE)},
+        {"MIN_DEAD_PCT", static_cast<double>(MIN_DEAD_PCT)},
+        {"FLOTDrawDistance", static_cast<double>(FLOTDrawDistance)},
+        {"FLOTSortDirection", static_cast<double>(FLOTSortDirection)},
+        {"TheaterXPosition", static_cast<double>(TheaterXPosition)},
+        {"TheaterYPosition", static_cast<double>(TheaterYPosition)},
     };
     out << '{';
     for (size_t i = 0; i < sizeof items / sizeof *items; ++i) out << (i ? "," : "") << '"' << items[i].key << "\":" << items[i].value;
@@ -190,6 +352,31 @@ void unit(std::ostream& out, Unit u) {
         }
         out << ",\"stores_want\":" << want << ",\"stores_got\":" << got << ",\"fuel_lb\":" << s->GetSquadronFuel()
             << ",\"last_resupply\":" << s->GetLastResupplyTime() << ",\"airbase\":" << quoted(s->GetUnitAirbaseID());
+        // The whole squadron record (SquadronClass): stores as [weapon, count] pairs, pilots, schedule.
+        out << ",\"squadron\":{\"fuel\":" << s->GetSquadronFuel() << ",\"specialty\":" << s->GetUnitSpecialty()
+            << ",\"hot_spot\":" << quoted(s->GetHotSpot()) << ",\"aa_kills\":" << s->GetAAKills() << ",\"ag_kills\":" << s->GetAGKills()
+            << ",\"as_kills\":" << s->GetASKills() << ",\"an_kills\":" << s->GetANKills() << ",\"missions_flown\":" << s->GetMissionsFlown()
+            << ",\"mission_score\":" << s->GetMissionScore() << ",\"total_losses\":" << int(s->GetTotalLosses())
+            << ",\"pilot_losses\":" << int(s->GetPilotLosses()) << ",\"assigned\":" << int(s->GetAssigned())
+            << ",\"patch\":" << int(s->GetPatchID()) << ",\"last_resupply\":" << s->GetLastResupply()
+            << ",\"last_resupply_time\":" << s->GetLastResupplyTime() << ",\"retask_at\":" << s->squadronRetaskAt << ",\"rating\":";
+        int rating[ARO_OTHER];
+        for (int i = 0; i < ARO_OTHER; ++i) rating[i] = s->GetRating(i);
+        array(out, rating, ARO_OTHER);
+        out << ",\"schedule\":[";
+        for (int i = 0; i < VEHICLE_GROUPS_PER_UNIT; ++i) out << (i ? "," : "") << s->GetSchedule(i);
+        out << "],\"stores\":[";
+        int n = 0;
+        for (int i = 0; i < MAXIMUM_WEAPTYPES; ++i)
+            if (s->GetUnitStores(i)) out << (n++ ? "," : "") << '[' << i << ',' << int(s->GetUnitStores(i)) << ']';
+        out << "],\"pilots\":[";
+        for (int i = 0; i < PILOTS_PER_SQUADRON; ++i) {
+            const PilotClass* p = s->GetPilotData(i);
+            out << (i ? "," : "") << '[' << p->pilot_id << ',' << int(p->pilot_skill_and_rating) << ',' << int(p->pilot_status) << ','
+                << int(p->aa_kills) << ',' << int(p->ag_kills) << ',' << int(p->as_kills) << ',' << int(p->an_kills) << ','
+                << p->missions_flown << ']';
+        }
+        out << "]}";
     }
     out << '}';
 }
@@ -307,6 +494,50 @@ void WriteCoreExport(const std::filesystem::path& directory) {
     }
     out << "],\"first_ground_tactic\":" << FirstGroundTactic << ",\"ground_tactics\":" << GroundTactics;
 
+    // Air planning tables: the mission table (mission.cpp MissionData), the default priority
+    // tables of air actions (team.cpp) and each squadron type's stores (SquadronStoresDataTable).
+    out << ",\"mission_data\":[";
+    for (int m = 0; m < AMIS_OTHER; ++m) {
+        const MissionDataType& d = MissionData[m];
+        out << (m ? "," : "") << '[' << int(d.type) << ',' << int(d.target) << ',' << int(d.skill) << ',' << int(d.mission_profile) << ','
+            << int(d.target_profile) << ',' << int(d.target_desc) << ',' << int(d.routewp) << ',' << int(d.targetwp) << ','
+            << d.minalt << ',' << d.maxalt << ',' << d.missionalt << ',' << d.separation << ',' << d.loitertime << ',' << int(d.str) << ','
+            << int(d.min_time) << ',' << int(d.max_time) << ',' << int(d.escorttype) << ',' << int(d.mindistance) << ','
+            << int(d.mintime) << ',' << int(d.caps) << ',' << d.flags << ']';
+    }
+    out << "],\"priority_tables\":{\"objtype\":[";
+    for (int a = 0; a < TAT_CAS; ++a) {
+        int row[MAX_TGTTYPE];
+        for (int i = 0; i < MAX_TGTTYPE; ++i) row[i] = DefaultObjtypePriority[a][i];
+        out << (a ? "," : "");
+        array(out, row, MAX_TGTTYPE);
+    }
+    out << "],\"unittype\":[";
+    for (int a = 0; a < TAT_CAS; ++a) {
+        int row[MAX_UNITTYPE];
+        for (int i = 0; i < MAX_UNITTYPE; ++i) row[i] = DefaultUnittypePriority[a][i];
+        out << (a ? "," : "");
+        array(out, row, MAX_UNITTYPE);
+    }
+    out << "],\"mission\":[";
+    for (int a = 0; a < TAT_CAS; ++a) {
+        int row[AMIS_OTHER];
+        for (int i = 0; i < AMIS_OTHER; ++i) row[i] = DefaultMissionPriority[a][i];
+        out << (a ? "," : "");
+        array(out, row, AMIS_OTHER);
+    }
+    out << "]},\"squadron_stores\":[";
+    for (int t = 0; t < NumSquadTypes; ++t) {
+        const SquadronStoresDataType& d = SquadronStoresDataTable[t];
+        out << (t ? "," : "") << "{\"infinite_ag\":" << int(d.infiniteAG) << ",\"infinite_aa\":" << int(d.infiniteAA)
+            << ",\"infinite_gun\":" << int(d.infiniteGun) << ",\"stores\":[";
+        int n = 0;
+        for (int i = 0; i < MAXIMUM_WEAPTYPES; ++i)
+            if (d.Stores[i]) out << (n++ ? "," : "") << '[' << i << ',' << int(d.Stores[i]) << ']';
+        out << "]}";
+    }
+    out << ']';
+
     out << ",\"teams\":[";
     for (int t = 0; t < NUM_TEAMS; ++t) {
         TeamClass* team = TeamInfo[t];
@@ -333,7 +564,39 @@ void WriteCoreExport(const std::filesystem::path& directory) {
             << ",\"bonuses\":[";
         for (int b = 0; b < MAX_BONUSES; ++b)
             out << (b ? "," : "") << '[' << quoted(team->bonusObjs[b]) << ',' << team->bonusTime[b] << ']';
-        out << "],\"gtm_flags\":" << (team->gtm ? team->gtm->flags : 0) << '}';
+        out << "],\"gtm_flags\":" << (team->gtm ? team->gtm->flags : 0);
+        // Air planning state: actions, player priorities and the air tasking manager's persistent
+        // part (the request lists are not saved by the legacy campaign either).
+        auto action = [&](const TeamAirActionType* a) {
+            out << "{\"start\":" << a->actionStartTime << ",\"stop\":" << a->actionStopTime << ",\"objective\":" << quoted(a->actionObjective)
+                << ",\"last_objective\":" << quoted(a->lastActionObjective) << ",\"type\":" << int(a->actionType) << '}';
+        };
+        int objtype[MAX_TGTTYPE], unittype[MAX_UNITTYPE], mission[AMIS_OTHER];
+        for (int i = 0; i < MAX_TGTTYPE; ++i) objtype[i] = team->GetObjTypePriority(i);
+        for (int i = 0; i < MAX_UNITTYPE; ++i) unittype[i] = team->GetUnitTypePriority(i);
+        for (int i = 0; i < AMIS_OTHER; ++i) mission[i] = team->GetMissionPriority(i);
+        out << ",\"air\":{\"offensive\":"; action(team->GetOffensiveAirAction());
+        out << ",\"defensive\":"; action(team->GetDefensiveAirAction());
+        out << ",\"objtype_priority\":"; array(out, objtype, MAX_TGTTYPE);
+        out << ",\"unittype_priority\":"; array(out, unittype, MAX_UNITTYPE);
+        out << ",\"mission_priority\":"; array(out, mission, AMIS_OTHER);
+        if (AirTaskingManagerClass* atm = team->atm) {
+            out << ",\"atm\":{\"flags\":" << atm->flags << ",\"average_ca_strength\":" << atm->averageCAStrength
+                << ",\"average_ca_missions\":" << atm->averageCAMissions << ",\"sample_cycles\":" << int(atm->sampleCycles)
+                << ",\"current_ca_missions\":" << int(atm->currentCAMissions) << ",\"missions_to_fill\":" << atm->missionsToFill
+                << ",\"missions_filled\":" << atm->missionsFilled << ",\"supply_base\":" << int(atm->supplyBase)
+                << ",\"cycle\":" << int(atm->cycle) << ",\"schedule_time\":" << atm->scheduleTime << ",\"airbases\":[";
+            int n = 0;
+            for (ATMAirbaseClass* ab = atm->airbaseList; ab; ab = ab->next) {
+                int schedule[ATM_MAX_CYCLES];
+                for (int i = 0; i < ATM_MAX_CYCLES; ++i) schedule[i] = ab->schedule[i];
+                out << (n++ ? "," : "") << "{\"id\":" << quoted(ab->id) << ",\"usage\":" << int(ab->usage) << ",\"schedule\":";
+                array(out, schedule, ATM_MAX_CYCLES);
+                out << '}';
+            }
+            out << "]}";
+        }
+        out << "}}";
     }
     // The trigger script as the legacy CheckTriggers reads it (loose file or packed in the .cam).
     std::string script;
@@ -364,7 +627,7 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         return order;
     };
     auto at = [](const std::map<VU_ID, int>& order, VU_ID id) { const auto it = order.find(id); return it == order.end() ? -1 : it->second; };
-    const auto objectiveList = listOrder(AllObjList), objectiveGrid = gridOrder(ObjProxList);
+    const auto objectiveList = listOrder(AllObjList), objectiveGrid = gridOrder(ObjProxList), campList = listOrder(AllCampList);
     out << ",\"objectives\":[";
     comma = false;
     {
@@ -386,7 +649,8 @@ void WriteCoreExport(const std::filesystem::path& directory) {
                 array(out, o->link_data[n].costs, MOVEMENT_TYPES);
                 out << '}';
             }
-            out << "],\"order\":[" << at(objectiveList, o->Id()) << ',' << at(objectiveGrid, o->Id()) << ']';
+            out << "],\"order\":[" << at(objectiveList, o->Id()) << ',' << at(objectiveGrid, o->Id()) << ',' << at(campList, o->Id())
+                << "],\"emitting\":" << (o->IsEmitting() ? 1 : 0);
             if (o->IsPrimary()) {
                 if (POData pd = GetPOData(o)) {
                     out << ",\"po\":{\"flags\":" << int(pd->flags) << ",\"ground_priority\":";
@@ -394,6 +658,7 @@ void WriteCoreExport(const std::filesystem::path& directory) {
                     out << ",\"ground_assigned\":"; array(out, pd->ground_assigned, NUM_TEAMS);
                     out << ",\"air_priority\":"; array(out, pd->air_priority, NUM_TEAMS);
                     out << ",\"operator_priority\":"; array(out, pd->operator_priority, NUM_TEAMS);
+                    out << ",\"player_priority\":"; array(out, pd->player_priority, NUM_TEAMS);
                     out << '}';
                 }
             }
@@ -413,7 +678,7 @@ void WriteCoreExport(const std::filesystem::path& directory) {
     };
     const auto real = listed(AllRealList), parents = listed(AllParentList), inactive = listed(InactiveList);
     const auto unitList = listOrder(AllUnitList), realList = listOrder(AllRealList), parentList = listOrder(AllParentList),
-               inactiveList = listOrder(InactiveList), unitGrid = gridOrder(RealUnitProxList);
+               inactiveList = listOrder(InactiveList), unitGrid = gridOrder(RealUnitProxList), airList = listOrder(AllAirList);
     std::set<VU_ID> written;
     auto emit = [&](Unit u) {
         if (!written.insert(u->Id()).second) return;
@@ -422,7 +687,8 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         out.seekp(-1, std::ios_base::cur);
         out << ",\"lists\":[" << (real.count(u->Id()) ? 1 : 0) << ',' << (parents.count(u->Id()) ? 1 : 0) << ','
             << (inactive.count(u->Id()) ? 1 : 0) << "],\"order\":[" << at(unitList, u->Id()) << ',' << at(realList, u->Id()) << ','
-            << at(parentList, u->Id()) << ',' << at(inactiveList, u->Id()) << ',' << at(unitGrid, u->Id()) << "]}";
+            << at(parentList, u->Id()) << ',' << at(inactiveList, u->Id()) << ',' << at(unitGrid, u->Id()) << ',' << at(campList, u->Id()) << ',' << at(airList, u->Id())
+            << "],\"radar\":[" << u->GetRadarMode() << ',' << (u->IsBattalion() ? static_cast<BattalionClass*>(u)->GetSearchMode() : 0) << "]}";
         comma = true;
     };
     { VuListIterator it(AllUnitList); for (VuEntity* e = it.GetFirst(); e; e = it.GetNext()) emit(static_cast<Unit>(e)); }

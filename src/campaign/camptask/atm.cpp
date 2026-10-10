@@ -1526,6 +1526,13 @@ void AirTaskingManagerClass::ProcessRequest(MissionRequest request)
         rand() % 100 < TeamInfo[mis->who]->GetGroundAction()->actionTempo)
         missionsToFill++;
 
+#ifdef FF_HEADLESS
+    // FF_AIR_TRACE=1: one stderr line per accepted request (headless diagnostics; reads state only).
+    static const bool traceAir = getenv("FF_AIR_TRACE") != nullptr;
+    if (traceAir)
+        fprintf(stderr, "[accepted] %lu team %d mission %d at %d,%d target %lu:%lu priority %d\n", TheCampaign.CurrentTime,
+                (int)mis->who, (int)mis->mission, mis->tx, mis->ty, mis->targetID.creator_, mis->targetID.num_, (int)mis->priority);
+#endif
 #ifdef KEV_ADEBUG
     MonoPrint("* Accepted %s request for team %d at %d,%d - tot %f - pri %d\n",
               MissStr[mis->mission], mis->who, mis->tx, mis->ty, mis->tot,
