@@ -199,6 +199,11 @@ void SetTime(unsigned long currentTime)
     SimDriver.lastRealTime = currentTime;
 #endif
     }
+#ifdef FF_HEADLESS
+    // The headless host has no campaign thread (HandleCampaignThread), which is what keeps
+    // TimeOfDay in step with CurrentTime; without this the campaign would stay at midnight.
+    TheCampaign.TimeOfDay = TheCampaign.CurrentTime % CampaignDay;
+#endif
 
     // ShiAssert
     // (

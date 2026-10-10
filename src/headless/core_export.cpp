@@ -26,6 +26,7 @@
 #include "campwp.h"
 #include "scenario.h"
 #include "falcsess.h"
+#include "playerop.h"
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -39,6 +40,7 @@ extern EventClass** CampEvents;
 extern short CE_Events;
 extern SquadronStoresDataType* SquadronStoresDataTable;
 extern bool g_bPowerGrid;
+extern int g_nNoPlayerPlay;
 
 namespace {
 
@@ -112,7 +114,9 @@ void constants(std::ostream& out) {
         {"ActionRate", ActionRate}, {"ActionTimeOut", ActionTimeOut}, {"DataRateModRepl", DataRateModRepl},
         {"DataRateModSup", DataRateModSup}, {"RelSquadBonus", RelSquadBonus}, {"NoActionBonusProd", NoActionBonusProd},
         {"NoTypeBonusRepl", NoTypeBonusRepl}, {"NewInitiativePoints", NewInitiativePoints}, {"CampBugFixes", CampBugFixes},
-        {"HitChanceAir", HitChanceAir}, {"HitChanceGround", HitChanceGround}, {"PowerGrid", g_bPowerGrid ? 1 : 0},
+        {"HitChanceAir", HitChanceAir}, {"HitChanceGround", HitChanceGround}, {"PowerGrid", g_bPowerGrid ? 1 : 0}, {"NoPlayerPlay", g_nNoPlayerPlay},
+        {"LOWAIR_RANGE_MODIFIER", LOWAIR_RANGE_MODIFIER}, {"DayZero", static_cast<double>(TheCampaign.DayZero)},
+        {"CampaignEnemyGroundExperience", static_cast<double>(PlayerOptions.CampaignEnemyGroundExperience())},
     };
     out << '{';
     for (size_t i = 0; i < sizeof items / sizeof *items; ++i) out << (i ? "," : "") << '"' << items[i].key << "\":" << items[i].value;
@@ -144,7 +148,9 @@ void unit(std::ostream& out, Unit u) {
     array(out, roster, VEHICLE_GROUPS_PER_UNIT);
     out << ",\"last_check\":" << u->GetLastCheck() << ",\"moved\":" << u->GetUnitMoved() << ",\"losses\":" << int(u->GetLosses())
         << ",\"tactic\":" << u->GetUnitTactic() << ",\"reinforcement\":" << u->GetUnitReinforcementLevel() << ",\"odds\":" << u->GetOdds()
-        << ",\"target\":" << quoted(u->GetTargetID()) << ",\"cargo\":" << quoted(u->GetCargoId()) << ",\"waypoints\":";
+        << ",\"target\":" << quoted(u->GetTargetID()) << ",\"cargo\":" << quoted(u->GetCargoId())
+        << ",\"spotted\":" << static_cast<unsigned short>(u->GetSpotted()) << ",\"spot_time\":" << u->GetSpotTime()
+        << ",\"emitting\":" << (u->IsEmitting() ? 1 : 0) << ",\"waypoints\":";
     waypoints(out, u);
     WayPoint current = u->GetCurrentUnitWP();
     int currentIndex = 0;
@@ -316,7 +322,7 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         out << ",\"max_vehicle\":"; array(out, team->max_vehicle, 4);
         out << ",\"experience\":{\"air\":" << int(team->airExperience) << ",\"air_defense\":" << int(team->airDefenseExperience)
             << ",\"ground\":" << int(team->groundExperience) << ",\"naval\":" << int(team->navalExperience) << "}"
-            << ",\"player_rating\":" << team->playerRating
+            << ",\"player_rating\":" << team->playerRating << ",\"last_player_mission\":" << team->lastPlayerMission
             << ",\"ground_action\":{\"type\":" << int(g->actionType) << ",\"time\":" << g->actionTime << ",\"timeout\":" << g->actionTimeout
             << ",\"objective\":" << quoted(g->actionObjective) << ",\"tempo\":" << int(g->actionTempo) << ",\"points\":" << int(g->actionPoints) << '}'
             << ",\"stats\":[" << s->airDefenseVehs << ',' << s->aircraft << ',' << s->groundVehs << ',' << s->ships << ',' << s->supply << ','
