@@ -122,6 +122,18 @@ remain aggregate. Active-list counts exclude inactive units in save headers.
 processing; it is not an aircraft-loss statistic. Execution does not validate
 historical accuracy, balance, or victory outcomes.
 
+## Battle service experiment
+
+`checkpoint-after <data-root> <scenario> <minutes> <new-dir> [seed]` saves an aggregate
+checkpoint after N campaign minutes. `battle <data-root> <checkpoint-dir> <x|auto> <y>
+<radius-km> <seconds> <frozen|live> <new-dir> [seed]` (experimental, `battle_service.cpp`)
+loads it and runs one detailed region. `auto` centres the region on the closest hostile
+battalion pair. `frozen` keeps `DoCampaignLoop` and `UpdateRealUnits` from running; `live`
+behaves like the observer. After draining and reaggregating, it saves `<new-dir>/after` and
+writes `<new-dir>/result.json`, with a result diff and an audit of every unit's and
+objective's native record inside and outside the region. Used by the parent workspace's
+`scripts/battle-experiment.py`; findings are in `migration/PHASE2-BATTLE.md`.
+
 ## Profiling
 
 Set `FF_HEADLESS_PROFILE=<file.json>` (an absolute path; the host changes into the data

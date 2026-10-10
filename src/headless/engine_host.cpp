@@ -33,6 +33,7 @@
 #include "theater_remap.h"
 #include "objective_rebuild.h"
 #include "objective_layout.h"
+#include "battle_service.h"
 #include "objectiv.h"
 #include <random>
 
@@ -303,7 +304,11 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
     try {
         // conquest <data-root> <scenario> <max-days> <log.jsonl> [seed]
         const bool conquest = args[1] == "conquest";
-        const size_t seedIndex = conquest ? 6 : 5;
+        // checkpoint-after <data-root> <scenario> <minutes> <new-output-directory> [seed]
+        const bool checkpointAfter = args[1] == "checkpoint-after";
+        // battle <data-root> <checkpoint-dir> <x|auto> <y> <radius-km> <seconds> <frozen|live> <out-dir> [seed]
+        const bool battle = args[1] == "battle";
+        const size_t seedIndex = battle ? 10 : (conquest || checkpointAfter) ? 6 : 5;
         if (args.size() != seedIndex && args.size() != seedIndex + 1) { std::cerr << "{\"status\":\"error\",\"simulation_advanced\":false,\"error\":\"Usage: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\"}\n"; return 2; }
         const auto data = std::filesystem::absolute(std::filesystem::u8path(args[2]));
         const auto conquestLogFile = conquest ? std::filesystem::absolute(std::filesystem::u8path(args[5])) : std::filesystem::path();
@@ -314,20 +319,21 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         size_t parsed = 0;
         const bool damageCheckpoint=args[1]=="damage-checkpoint-test" || args[1]=="fault-checkpoint-test";
         const bool diagnostic = args[1] == "detail-test" || damageCheckpoint;
-        const bool checkpoint=args[1]=="checkpoint" || damageCheckpoint, resume=args[1]=="resume" || args[1]=="watch-resume";
+        const bool checkpoint=args[1]=="checkpoint" || checkpointAfter || damageCheckpoint, resume=args[1]=="resume" || args[1]=="watch-resume" || battle;
         // remap-theater <data-root> <scenario> <remap.txt> <new-output-directory>
         // rebuild-objectives <data-root> <scenario> <objectives.txt> <new-output-directory>
         const bool rebuild=args[1]=="rebuild-objectives";
         const bool remap=args[1]=="remap-theater" || rebuild;
         if(remap && args.size()!=6) throw std::runtime_error("Usage: ff-campaign " + args[1] + " <data-root> <scenario-name> <plan-file> <new-output-directory>");
-        const auto checkpointDirectory=(checkpoint||resume)?std::filesystem::absolute(std::filesystem::u8path(args[checkpoint?4:3])):remap?std::filesystem::absolute(std::filesystem::u8path(args[5])):std::filesystem::path();
+        const auto checkpointDirectory=(checkpoint||resume)?std::filesystem::absolute(std::filesystem::u8path(args[checkpointAfter?5:checkpoint?4:3])):remap?std::filesystem::absolute(std::filesystem::u8path(args[5])):std::filesystem::path();
         if(checkpoint||resume) {
             char archivePath[MAX_PATH];
             setPath(archivePath,checkpointDirectory / "checkpoint.cam");
         }
         if((checkpoint||remap) && std::filesystem::exists(checkpointDirectory)) throw std::runtime_error("Checkpoint output directory must not already exist");
-        const int minutes = interactive ? 10080 : (diagnostic||checkpoint||remap) ? 1 : std::stoi(args[4], &parsed) * (conquest ? 1440 : 1);
-        if (!interactive && !diagnostic && !checkpoint && !remap && parsed != args[4].size()) throw std::runtime_error("Invalid duration");
+        const bool fixedDuration = diagnostic || (checkpoint && !checkpointAfter) || remap || battle;
+        const int minutes = interactive ? 10080 : fixedDuration ? 1 : std::stoi(args[4], &parsed) * (conquest ? 1440 : 1);
+        if (!interactive && !fixedDuration && parsed != args[4].size()) throw std::runtime_error("Invalid duration");
         unsigned seed = 1;
         if (args.size() == seedIndex + 1 && !remap) {
             const auto value = std::stoull(args[seedIndex], &parsed);
@@ -442,6 +448,12 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
             watch->publish("snapshot");
             std::cout.flush(); std::cerr.flush(); std::_Exit(0);
         }
+#ifdef FF_DETAILED_ENGINE
+        if (battle) {
+            RunBattleService(args);
+            std::cout.flush(); std::cerr.flush(); std::_Exit(0);
+        }
+#endif
         if(!resume) DoCampaignLoop(1);
         if (watch) watch->initialize(scenario);
         std::unique_ptr<ConquestLog> conquestLog;

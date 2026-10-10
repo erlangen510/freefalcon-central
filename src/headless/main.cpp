@@ -17,7 +17,9 @@ int Run(const std::vector<std::string>& args) {
                      "Run: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\n"
                      "Conquest: ff-campaign conquest <data-root> <scenario-name> <max-days> <log.jsonl> [seed] (stops once a team holds every starting objective of an enemy)\n"
                      "Checkpoint: ff-campaign checkpoint <data-root> <scenario-name> <new-output-directory> [seed] (advances one minute)\n"
+                     "Checkpoint after: ff-campaign checkpoint-after <data-root> <scenario-name> <minutes> <new-output-directory> [seed]\n"
                      "Resume: ff-campaign resume <data-root> <checkpoint-directory> <minutes> [seed]\n"
+                     "Battle (experimental): ff-campaign battle <data-root> <checkpoint-directory> <x|auto> <y> <radius-km> <seconds> <frozen|live> <new-output-directory> [seed]\n"
                      "Watch: ff-campaign watch <data-root> <scenario-name> <session-directory> [seed]\n"
                      "Watch resume: ff-campaign watch-resume <data-root> <checkpoint-directory> <session-directory> [seed]\n"
                      "Remap theater: ff-campaign remap-theater <data-root> <scenario-name> <remap-file> <new-output-directory> (relocate onto the data root's grid, save checkpoint)\n"
@@ -26,7 +28,7 @@ int Run(const std::vector<std::string>& args) {
                      "Detail: ff-campaign detail-test <data-root> <scenario-name> <hit|miss|unarmed|air|ground|helo|sea|feature|region> [seed]\n";
         return 0;
     }
-    if (args.size() >= 2 && (args[1] == "run" || args[1] == "conquest" || args[1] == "watch" || args[1] == "export-map" || args[1] == "detail-test" || args[1] == "checkpoint" || args[1] == "resume" || args[1] == "watch-resume" || args[1] == "damage-checkpoint-test" || args[1] == "fault-checkpoint-test" || args[1] == "remap-theater" || args[1] == "rebuild-objectives")) {
+    if (args.size() >= 2 && (args[1] == "run" || args[1] == "conquest" || args[1] == "checkpoint-after" || args[1] == "battle" || args[1] == "watch" || args[1] == "export-map" || args[1] == "detail-test" || args[1] == "checkpoint" || args[1] == "resume" || args[1] == "watch-resume" || args[1] == "damage-checkpoint-test" || args[1] == "fault-checkpoint-test" || args[1] == "remap-theater" || args[1] == "rebuild-objectives")) {
 #ifdef FF_CAMPAIGN_ENGINE
         return RunLegacyCampaign(args);
 #else

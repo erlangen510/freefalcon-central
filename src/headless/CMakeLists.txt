@@ -98,7 +98,7 @@ if(NOT FF_BUILD_DETAILED_ENGINE)
 endif()
 if(FF_BUILD_DETAILED_ENGINE)
   target_compile_definitions(ff_headless_options INTERFACE FF_DETAILED_ENGINE=1)
-  target_sources(ff_campaign_engine PRIVATE ${FF_ROOT}/sim/simdrive/simatc.cpp detailed.cpp countermeasure_test.cpp region.cpp sim_services.cpp detailed_presentation.cpp physical_world.cpp physical_materials.cpp physical_models.cpp
+  target_sources(ff_campaign_engine PRIVATE ${FF_ROOT}/sim/simdrive/simatc.cpp detailed.cpp battle_service.cpp countermeasure_test.cpp region.cpp sim_services.cpp detailed_presentation.cpp physical_world.cpp physical_materials.cpp physical_models.cpp
     ${FF_ROOT}/sim/displays/sms.cpp ${FF_ROOT}/sim/displays/mslsms.cpp ${FF_ROOT}/sim/displays/bombsms.cpp ${FF_ROOT}/sim/displays/gunsms.cpp
     ${FF_ROOT}/sim/eject/simeject.cpp ${FF_ROOT}/sim/navaids/navsystem.cpp
     ${FF_ROOT}/graphics/objects/drawbsp.cpp
