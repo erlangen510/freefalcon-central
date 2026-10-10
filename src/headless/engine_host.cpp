@@ -293,6 +293,8 @@ private:
     bool milestone[2][NUM_TEAMS][NUM_TEAMS]={};
 };
 
+void WriteCoreExport(const std::filesystem::path& directory);
+
 int RunLegacyCampaign(const std::vector<std::string>& args) {
     // CampaignThread and SimLoop normally configure this per-thread. The
     // headless host replaces both loops and must preserve their numeric mode.
@@ -312,14 +314,17 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
         if (args.size() != seedIndex && args.size() != seedIndex + 1) { std::cerr << "{\"status\":\"error\",\"simulation_advanced\":false,\"error\":\"Usage: ff-campaign run <data-root> <scenario-name> <minutes> [seed]\"}\n"; return 2; }
         const auto data = std::filesystem::absolute(std::filesystem::u8path(args[2]));
         const auto conquestLogFile = conquest ? std::filesystem::absolute(std::filesystem::u8path(args[5])) : std::filesystem::path();
-        const bool exportMap = args[1] == "export-map";
+        // export-checkpoint <data-root> <checkpoint-dir> <output-directory>: export-map of a saved checkpoint.
+        const bool exportMap = args[1] == "export-map" || args[1] == "export-checkpoint";
+        // Resolved before the host changes into the data root.
+        const auto exportDirectory = exportMap ? std::filesystem::absolute(std::filesystem::u8path(args[4])) : std::filesystem::path();
         const bool interactive = args[1] == "watch" || args[1] == "watch-resume" || exportMap;
         if (interactive) watch = std::make_unique<CampaignWatch>(std::filesystem::absolute(std::filesystem::u8path(args[4])));
         const auto wallStart = std::chrono::steady_clock::now();
         size_t parsed = 0;
         const bool damageCheckpoint=args[1]=="damage-checkpoint-test" || args[1]=="fault-checkpoint-test";
         const bool diagnostic = args[1] == "detail-test" || damageCheckpoint;
-        const bool checkpoint=args[1]=="checkpoint" || checkpointAfter || damageCheckpoint, resume=args[1]=="resume" || args[1]=="watch-resume" || battle;
+        const bool checkpoint=args[1]=="checkpoint" || checkpointAfter || damageCheckpoint, resume=args[1]=="resume" || args[1]=="watch-resume" || args[1]=="export-checkpoint" || battle;
         // remap-theater <data-root> <scenario> <remap.txt> <new-output-directory>
         // rebuild-objectives <data-root> <scenario> <objectives.txt> <new-output-directory>
         const bool rebuild=args[1]=="rebuild-objectives";
@@ -446,6 +451,7 @@ int RunLegacyCampaign(const std::vector<std::string>& args) {
             // planning or any campaign time.
             watch->initialize(scenario);
             watch->publish("snapshot");
+            WriteCoreExport(exportDirectory);
             std::cout.flush(); std::cerr.flush(); std::_Exit(0);
         }
 #ifdef FF_DETAILED_ENGINE

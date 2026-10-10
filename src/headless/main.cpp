@@ -25,10 +25,11 @@ int Run(const std::vector<std::string>& args) {
                      "Remap theater: ff-campaign remap-theater <data-root> <scenario-name> <remap-file> <new-output-directory> (relocate onto the data root's grid, save checkpoint)\n"
                      "Rebuild objectives: ff-campaign rebuild-objectives <data-root> <scenario-name> <objectives-file> <new-output-directory> (open-data objective set, save checkpoint)\n"
                      "Export map: ff-campaign export-map <data-root> <scenario-name> <output-directory> (loaded state, no campaign time)\n"
+                     "Export checkpoint: ff-campaign export-checkpoint <data-root> <checkpoint-dir> <output-directory>\n"
                      "Detail: ff-campaign detail-test <data-root> <scenario-name> <hit|miss|unarmed|air|ground|helo|sea|feature|region> [seed]\n";
         return 0;
     }
-    if (args.size() >= 2 && (args[1] == "run" || args[1] == "conquest" || args[1] == "checkpoint-after" || args[1] == "battle" || args[1] == "watch" || args[1] == "export-map" || args[1] == "detail-test" || args[1] == "checkpoint" || args[1] == "resume" || args[1] == "watch-resume" || args[1] == "damage-checkpoint-test" || args[1] == "fault-checkpoint-test" || args[1] == "remap-theater" || args[1] == "rebuild-objectives")) {
+    if (args.size() >= 2 && (args[1] == "run" || args[1] == "conquest" || args[1] == "checkpoint-after" || args[1] == "battle" || args[1] == "watch" || args[1] == "export-map" || args[1] == "export-checkpoint" || args[1] == "detail-test" || args[1] == "checkpoint" || args[1] == "resume" || args[1] == "watch-resume" || args[1] == "damage-checkpoint-test" || args[1] == "fault-checkpoint-test" || args[1] == "remap-theater" || args[1] == "rebuild-objectives")) {
 #ifdef FF_CAMPAIGN_ENGINE
         return RunLegacyCampaign(args);
 #else
