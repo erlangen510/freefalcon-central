@@ -640,6 +640,9 @@ private:
     float area, fuel, fuelFlow, fuelFlow2, externalFuel,
         epuFuel; //TJL 01/11/04 Added fuelFlow2 Engine 2
     float mass, weight, dragIndex, emptyWeight;
+    // Empty weight plus stores. weight is always nonFuelWeight + fuel + externalFuel
+    // (UpdateFuelWeight), so fuel bookkeeping cannot drift away from the tanks.
+    float nonFuelWeight;
     float gsAvail, maxGs, maxRoll, maxRollDelta, startRoll;
     float minVcas, maxVcas, cornerVcas;
     unsigned int flags;
@@ -1767,6 +1770,7 @@ public:
 #endif
     int BurnFuel(float bfuel);
     void RecalculateFuel(void);
+    void UpdateFuelWeight(void);
     void FeedTank(int t1, int t2, float dt);
     float FuelFlow(void)
     {

@@ -165,6 +165,7 @@ AirframeClass::AirframeClass(AircraftClass* self)
     hydrAB = 0; // JPO - start with none.
     jfsaccumulator = 100.0f;
     externalFuel = 0.0F;
+    nonFuelWeight = 0.0F;
     SetFlag(Trimming);
     SetFlag(InAir);
     SetFlag(EngineStopped); // JPO - start off stopped - preflight will start it
@@ -1152,6 +1153,7 @@ void AirframeClass::AddWeapon(float Weight, float DragIndex, float offset)
     //MonoPrint("AddWeapon W%f DI%f, O%f",Weight,DragIndex,offset);
 
     weight += Weight;
+    nonFuelWeight += Weight;
     mass += Weight / GRAVITY;
     dragIndex +=
         DragIndex; //*(18238.0F/emptyWeight); //equate for relative size differences
@@ -1171,6 +1173,7 @@ void AirframeClass::RemoveWeapon(float Weight, float DragIndex, float offset)
         Weight = weight - (emptyWeight + fuel + externalFuel);
 
     weight -= Weight;
+    nonFuelWeight -= Weight;
     mass -= Weight / GRAVITY;
     dragIndex -= DragIndex; //*(18238.0F/emptyWeight);
     dragIndex = max(dragIndex, 0.0F);
@@ -1437,17 +1440,15 @@ int AirframeClass::AddFuel(float lbs)
     if (fuel + lbs + externalFuel > maxfuel)
     {
         lbs = maxfuel - (fuel + externalFuel);
-        weight += lbs;
-        mass += lbs / GRAVITY;
         fuel = maxfuel;
         AllocateFuel(fuel); // JPO - allocate between tanks
+        UpdateFuelWeight();
         return FALSE;
     }
 
     fuel += lbs;
-    weight += lbs;
-    mass += lbs / GRAVITY;
     AllocateFuel(fuel + externalFuel); // JPO allocate between tanks
+    UpdateFuelWeight();
     return TRUE;
 }
 
@@ -1459,8 +1460,7 @@ void AirframeClass::AddExternalFuel(float lbs)
     }
 
     externalFuel += lbs;
-    weight += lbs;
-    mass += lbs / GRAVITY;
+    UpdateFuelWeight();
 }
 
 void AirframeClass::ResetAlpha(void)
@@ -1489,8 +1489,6 @@ void AirframeClass::ResetFuel(void)
 {
     float lbs = aeroDataset[vehicleIndex].inputData[AeroDataSet::InternalFuel] -
                 fuel; // JPO - use the constant...
-    weight += lbs;
-    mass += lbs / GRAVITY;
 
     float fullfuel = 0;
 
@@ -1500,6 +1498,7 @@ void AirframeClass::ResetFuel(void)
     //fuel = aeroDataset[vehicleIndex].inputData[2];
     // JPO - (re)allocate the fuel
     AllocateFuel(fullfuel);
+    UpdateFuelWeight();
 }
 
 

@@ -114,7 +114,7 @@ int AirframeClass::ReadData(int idx)
     SetPosition(initialX, initialY, initialZ);
     sigma = initialPsi;
 
-    emptyWeight = weight = aeroDataset[idx].inputData[AeroDataSet::EmptyWeight];
+    emptyWeight = weight = nonFuelWeight = aeroDataset[idx].inputData[AeroDataSet::EmptyWeight];
     area = aeroDataset[idx].inputData[AeroDataSet::Area];
 
     if (initialFuel < 0.0F)

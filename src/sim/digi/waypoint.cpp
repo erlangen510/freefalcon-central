@@ -110,7 +110,12 @@ void DigitalBrain::FollowWaypoints(void)
     // if we are, see if the next waypoint is a ground attack type.
     // if it is, setup a GA profile for the attack
 
-    if (((self->curWaypoint->GetWPFlags() bitand WPF_IP) or
+    // An RTB order ends the mission: its return leg may carry the mission's attack
+    // route action (e.g. SAD), which must not start a new ground attack profile.
+    const bool returning = IsReturningToBase();
+
+    if (not returning and
+        ((self->curWaypoint->GetWPFlags() bitand WPF_IP) or
          (GetTargetWPIndex() >= 0 and
           GetWaypointIndex() == GetTargetWPIndex() - 1)) and
         agDoctrine == AGD_NONE)
@@ -159,9 +164,14 @@ void DigitalBrain::FollowWaypoints(void)
 
     // 2001-06-28 MODIFIED BY S.G. DO BOTH WPAction AND WPRouteAction IF NO SPECIFIC WAYPOINT ACTION
     // switch (self->curWaypoint->GetWPAction())
-    switch (self->curWaypoint->GetWPAction() == WP_NOTHING ?
-                self->curWaypoint->GetWPRouteAction() :
-                self->curWaypoint->GetWPAction())
+    int waypointAction = self->curWaypoint->GetWPAction() == WP_NOTHING ?
+                             self->curWaypoint->GetWPRouteAction() :
+                             self->curWaypoint->GetWPAction();
+
+    if (returning and waypointAction not_eq WP_LAND)
+        waypointAction = WP_NOTHING;
+
+    switch (waypointAction)
     {
     case WP_GNDSTRIKE:
     case WP_NAVSTRIKE:

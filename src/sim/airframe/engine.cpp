@@ -639,6 +639,8 @@ void AirframeClass::EngineModel(float dt)
             {
                 // JPO - fuel is now burnt and transferred.
                 BurnFuel(fuelFlowSS * dt / 3600.0F);
+                RecalculateFuel();
+                UpdateFuelWeight();
 #if 0 // old code
 
                 if (externalFuel > 0.0)
@@ -647,8 +649,6 @@ void AirframeClass::EngineModel(float dt)
                     fuel = fuel - fuelFlowSS * dt / 3600.0F ;//me123 deleted + externalFuel;
 
 #endif
-                weight -= fuelFlowSS * dt / 3600.0F;
-                mass = weight / GRAVITY;
             }
 
             /*
@@ -1452,8 +1452,8 @@ void AirframeClass::MultiEngineModel(float dt)
             // JPO - fuel is now burnt and transferred.
             //Using combined total between engines
             BurnFuel(fuelFlowSS * dt / 3600.0F);
-            weight -= fuelFlowSS * dt / 3600.0F;
-            mass = weight / GRAVITY;
+            RecalculateFuel();
+            UpdateFuelWeight();
         }
 
         //TJL 02/21/04
@@ -1985,8 +1985,8 @@ void AirframeClass::MultiEngineModel(float dt)
                 // JPO - fuel is now burnt and transferred.
                 //Using combined total between engines
                 BurnFuel(fuelFlowSS2 * dt / 3600.0F);
-                weight -= fuelFlowSS2 * dt / 3600.0F;
-                mass = weight / GRAVITY;
+                RecalculateFuel();
+                UpdateFuelWeight();
             }
         }
 
@@ -2370,11 +2370,8 @@ void AirframeClass::AllocateFuel(float totalfuel)
 #ifdef FF_DETAILED_ENGINE
 void AirframeClass::RestoreRemainingFuel(float totalfuel)
 {
-    const float previous=fuel+externalFuel;
     AllocateFuel(totalfuel);
-    const float delta=fuel+externalFuel-previous;
-    weight+=delta;
-    mass+=delta/GRAVITY;
+    UpdateFuelWeight();
 }
 #endif
 float AirframeClass::AvailableFuel()
@@ -2531,11 +2528,7 @@ void AirframeClass::DropTank(int n)
     ShiAssert(n >= 0 and n < MAX_FUEL);
     m_tanks[n] = 0.0f;
     m_tankcap[n] = 0.0f;
-    float fuelBefore = externalFuel;
     RecalculateFuel();
-    float fuelDropped = fuelBefore - externalFuel;
-    weight -= fuelDropped;
-    mass = weight / GRAVITY;
 }
 
 // recalculate the quick access.
@@ -2555,6 +2548,16 @@ void AirframeClass::RecalculateFuel()
 
     for (int i = TANK_MAXINTERNAL + 1; i < MAX_FUEL; i++)
         externalFuel += m_tanks[i];
+
+    UpdateFuelWeight();
+}
+
+// Weight follows the fuel actually held in the tanks. Incremental updates drifted from
+// it through float rounding, burns from empty tanks and capped allocations.
+void AirframeClass::UpdateFuelWeight()
+{
+    weight = nonFuelWeight + fuel + externalFuel;
+    mass = weight / GRAVITY;
 }
 
 // fuel dial stuff
