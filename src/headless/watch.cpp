@@ -85,7 +85,10 @@ void CampaignWatch::write(const char* name, const std::string& contents) {
 
 void CampaignWatch::initialize(const char* scenario) {
     std::ostringstream out;
-    out << "{\"schema\":2,\"capabilities\":{\"regional_3d\":true,\"native_detailed_combat\":true},\"scenario\":" << text(scenario) << ",\"width\":" << Map_Max_X
+    out << "{\"schema\":2,\"protocol_version\":" << kWatchProtocolVersion << ",\"backend_id\":\"legacy_ff\""
+        << ",\"capabilities\":{\"regional_3d\":true,\"native_detailed_combat\":true,\"strategic_campaign\":true"
+        << ",\"detailed_ground_combat\":true,\"detailed_air_combat\":true,\"missions\":true,\"save_restore\":true"
+        << ",\"deterministic_replay\":false,\"headless_fast_forward\":false},\"scenario\":" << text(scenario) << ",\"width\":" << Map_Max_X
         << ",\"height\":" << Map_Max_Y << ",\"cell_km\":1,\"teams\":[";
     for (int i = 0; i < NUM_TEAMS; ++i) {
         if (i) out << ',';
@@ -210,17 +213,23 @@ void CampaignWatch::command() {
     std::istringstream in(commandText(directory / "control.txt"));
     unsigned long long seq, steps;
     int rate, pause, stop;
-    if (!(in >> seq >> rate >> pause >> steps >> stop) || seq <= sequence) return;
-    if ((rate != 1 && rate != 5 && rate != 10 && rate != 20 && rate != 100) || pause < 0 || pause > 1 || stop < 0 || stop > 1 || steps < requestedSteps || steps - requestedSteps > 100) return;
+    if (!(in >> seq) || seq <= sequence) return;
+    // Reported, not applied; the same sequence number stays usable for a corrected command.
+    const auto reject = [&](const char* reason) { controlRejected = seq; controlRejectReason = reason; };
+    if (!(in >> rate >> pause >> steps >> stop)) return reject("malformed");
+    if (rate != 1 && rate != 5 && rate != 10 && rate != 20 && rate != 100) return reject("invalid_speed");
+    if (pause < 0 || pause > 1 || stop < 0 || stop > 1) return reject("invalid_flag");
+    if (steps < requestedSteps) return reject("steps_decreased");
+    if (steps - requestedSteps > 100) return reject("step_burst");
     bool active = regionActive;
     double x = regionX, y = regionY, radius = regionRadius;
     std::string extension;
     if (in >> extension) {
         int enabled;
-        if (extension != "region" || !(in >> enabled >> x >> y >> radius)) return;
+        if (extension != "region" || !(in >> enabled >> x >> y >> radius)) return reject("malformed_region");
         if ((enabled != 0 && enabled != 1) || !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(radius)
-            || x < 0 || y < 0 || x >= Map_Max_X || y >= Map_Max_Y || radius < 2 || radius > 20) return;
-        std::string extra; if (in >> extra) return;
+            || x < 0 || y < 0 || x >= Map_Max_X || y >= Map_Max_Y || radius < 2 || radius > 20) return reject("invalid_region");
+        std::string extra; if (in >> extra) return reject("trailing_fields");
         active = enabled != 0;
     }
     // Enforced by the server, including clients sending an old five-field command.
@@ -233,20 +242,22 @@ void CampaignWatch::command() {
     if (speed != rate || paused != bool(pause)) credit = 0;
     regionActive = active; regionX = x; regionY = y; regionRadius = radius;
     sequence = seq; speed = rate; paused = pause != 0; requestedSteps = steps; stopping = stop != 0;
+    ++stateVersion;
     heartbeat = Clock::now();
 }
 
 void CampaignWatch::unitAction() {
     std::istringstream in(commandText(directory / "action.txt"));
     unsigned long long seq,creator,number;std::string seqText,creatorText,numberText,action,extra;
-    if(!(in>>seqText>>creatorText>>numberText>>action) || (in>>extra)) return;
     auto parse=[](const std::string& text,unsigned long long& value) {
         const auto result=std::from_chars(text.data(),text.data()+text.size(),value);
         return result.ec==std::errc{} && result.ptr==text.data()+text.size();
     };
-    if(!parse(seqText,seq) || !parse(creatorText,creator) || !parse(numberText,number) || seq<=actionSequence) return;
-    if(creator>UINT32_MAX || number>UINT32_MAX) return;
-    actionSequence=seq;
+    if(!(in>>seqText) || !parse(seqText,seq) || seq<=actionSequence) return;
+    // Reported, not applied; the same sequence number stays usable for a corrected command.
+    if(!(in>>creatorText>>numberText>>action) || (in>>extra) || !parse(creatorText,creator) || !parse(numberText,number)
+       || creator>UINT32_MAX || number>UINT32_MAX) {actionRejected=seq;actionRejectReason="malformed";return;}
+    actionSequence=seq;++stateVersion;
     actionStatus=QueueDetailedAction(static_cast<uint32_t>(creator),static_cast<uint32_t>(number),action);
 }
 
@@ -255,7 +266,7 @@ void CampaignWatch::saveCommand() {
     unsigned long long seq=0;
     const auto parsed=std::from_chars(request.data(),request.data()+request.size(),seq);
     if(parsed.ec!=std::errc{} || parsed.ptr!=request.data()+request.size() || seq<=saveSequence) return;
-    saveSequence=seq;saveError.clear();savePath.clear();
+    saveSequence=seq;++stateVersion;saveError.clear();savePath.clear();
     if(!paused || remainingStepMs || consumedSteps!=requestedSteps || regionActive || DetailedRegionActive()) {saveStatus="requires_paused_aggregate";return;}
     try {
         const auto destination=directory/("checkpoint-"+std::to_string(seq));
@@ -271,7 +282,7 @@ void CampaignWatch::commanderCommand() {
     unsigned long long seq=0;
     const auto parsed=std::from_chars(request.data(),request.data()+space,seq);
     if(parsed.ec!=std::errc{} || parsed.ptr!=request.data()+space || seq<=commanderSequence) return;
-    commanderSequence=seq;
+    commanderSequence=seq;++stateVersion;
     commanderStatus=ApplyCommanderCommand(request.substr(space+1));
 }
 
@@ -289,11 +300,12 @@ bool CampaignWatch::waitForStep() {
         if (paused) {
             credit = 0;
             if (!remainingStepMs && consumedSteps < requestedSteps) { ++consumedSteps; remainingStepMs = 5000; }
-            if (remainingStepMs) { nextStepMs = min(quantum,remainingStepMs); remainingStepMs -= nextStepMs; return true; }
+            if (remainingStepMs) { nextStepMs = min(quantum,remainingStepMs); remainingStepMs -= nextStepMs; ++stateVersion; return true; }
         } else {
+            coalescedSteps += requestedSteps - consumedSteps;
             consumedSteps = requestedSteps;
             credit += (elapsed < 0.5 ? elapsed : 0.5) * speed;
-            if (credit >= quantum * .001) { credit -= quantum * .001; nextStepMs=quantum; return true; }
+            if (credit >= quantum * .001) { credit -= quantum * .001; nextStepMs=quantum; ++stateVersion; return true; }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(DetailedRegionActive() ? 1 : 5));
     }
@@ -302,9 +314,13 @@ bool CampaignWatch::waitForStep() {
 void CampaignWatch::publish(const char* status) {
     FF_PROFILE(PROFILE_WATCH_PUBLISH);
     std::ostringstream out;
-    out << "{\"schema\":2,\"frame\":" << ++frame << ",\"status\":" << text(status)
+    out << "{\"schema\":2,\"protocol_version\":" << kWatchProtocolVersion << ",\"backend_id\":\"legacy_ff\",\"snapshot_kind\":\"full\""
+        << ",\"state_version\":" << stateVersion << ",\"frame\":" << ++frame << ",\"status\":" << text(status)
         << ",\"time_ms\":" << TheCampaign.CurrentTime << ",\"ack\":" << sequence
-        << ",\"unit_action\":{\"ack\":"<<actionSequence<<",\"status\":"<<text(actionStatus.c_str())<<"}"
+        << ",\"control_rejected\":{\"sequence\":" << controlRejected << ",\"reason\":" << text(controlRejectReason.c_str()) << '}'
+        << ",\"steps\":{\"requested\":" << requestedSteps << ",\"consumed\":" << consumedSteps << ",\"coalesced\":" << coalescedSteps << '}'
+        << ",\"unit_action\":{\"ack\":"<<actionSequence<<",\"status\":"<<text(actionStatus.c_str())
+        << ",\"rejected\":{\"sequence\":"<<actionRejected<<",\"reason\":"<<text(actionRejectReason.c_str())<<"}}"
         << ",\"checkpoint\":{\"ack\":"<<saveSequence<<",\"status\":"<<text(saveStatus.c_str())<<",\"path\":"<<ff::headless::JsonString(savePath)<<",\"error\":"<<ff::headless::JsonString(saveError)<<",\"can_save\":"<<((paused&&!remainingStepMs&&consumedSteps==requestedSteps&&!regionActive&&!DetailedRegionActive())?"true":"false")<<"}"
         << ",\"speed\":" << speed << ",\"paused\":" << (paused ? "true" : "false")
         << ",\"region\":{\"active\":" << (regionActive ? "true" : "false")
