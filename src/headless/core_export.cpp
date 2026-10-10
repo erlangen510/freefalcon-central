@@ -30,6 +30,8 @@
 #include "scenario.h"
 #include "falcsess.h"
 #include "weaplist.h"
+#include "atcbrain.h"
+#include "radardata.h"
 #include "playerop.h"
 #include <fstream>
 #include <sstream>
@@ -60,6 +62,14 @@ extern bool g_bFireOntheMove;
 extern bool g_bRealisticAttrition;
 extern bool g_bLoadoutSquadStoreResupply;
 extern int g_nFlightVisualBonus;
+extern PilotInfoClass* PilotInfo;
+extern RadarDataSet* radarDatFileTable;
+extern short NumRadarDatFileTable;
+extern int NumPilots;
+extern bool g_bEnableABRelocation;
+extern bool g_bScramble;
+extern int g_nAirbaseReloc;
+extern int g_nRelocationWait;
 extern float g_fIdentFactor;
 extern int ALT_TO_BUILD_RANGES_TO;
 extern int g_nNoPlayerPlay;
@@ -450,7 +460,9 @@ void WriteCoreExport(const std::filesystem::path& directory) {
             << ",\"max_speed\":" << v->MaxSpeed << ",\"high_alt\":" << v->HighAlt << ",\"low_alt\":" << v->LowAlt
             << ",\"cruise_alt\":" << v->CruiseAlt << ",\"fuel_econ\":" << v->FuelEcon << ",\"visible_flags\":" << v->VisibleFlags
             << ",\"rack_flags\":" << v->RackFlags << ",\"callsign\":[" << int(v->CallsignIndex) << ',' << int(v->CallsignSlots) << ']'
-            << ",\"hit_chance\":";
+            << ",\"radar\":[" << v->RadarType << ','
+            << (radarDatFileTable && v->RadarType >= 0 && v->RadarType < NumRadarDatFileTable ? radarDatFileTable[v->RadarType].Maxmissilesintheair : -1)
+            << "],\"hit_chance\":";
         array(out, v->HitChance, MOVEMENT_TYPES);
         out << ",\"strength\":"; array(out, v->Strength, MOVEMENT_TYPES);
         out << ",\"range\":"; array(out, v->Range, MOVEMENT_TYPES);
@@ -570,7 +582,20 @@ void WriteCoreExport(const std::filesystem::path& directory) {
         << ",\"old_sam_activity\":" << int(g_bOldSamActivity) << ",\"precision_waypoints\":" << int(g_bPrecisionWaypoints)
         << ",\"fire_on_the_move\":" << int(g_bFireOntheMove) << ",\"alt_to_build_ranges_to\":" << ALT_TO_BUILD_RANGES_TO
         << ",\"realistic_attrition\":" << int(g_bRealisticAttrition) << ",\"loadout_squad_store_resupply\":" << int(g_bLoadoutSquadStoreResupply)
-        << ",\"flight_visual_bonus\":" << g_nFlightVisualBonus << ",\"ident_factor\":" << g_fIdentFactor << '}';
+        << ",\"flight_visual_bonus\":" << g_nFlightVisualBonus << ",\"ident_factor\":" << g_fIdentFactor
+        << ",\"enable_ab_relocation\":" << int(g_bEnableABRelocation) << ",\"scramble\":" << int(g_bScramble)
+        << ",\"airbase_reloc\":" << g_nAirbaseReloc << ",\"relocation_wait\":" << g_nRelocationWait << '}';
+    // The pilot name pool (PilotInfo usage counts) and each team's pilot id ranges, for replacement pilots.
+    out << ",\"pilot_pool\":{\"usage\":[";
+    for (int i = 0; PilotInfo && i < NumPilots; ++i) out << (i ? "," : "") << PilotInfo[i].usage;
+    out << "],\"teams\":[";
+    for (int t = 0; t < NUM_TEAMS; ++t) {
+        out << (t ? "," : "");
+        if (!TeamInfo[t]) { out << "null"; continue; }
+        out << '[' << TeamInfo[t]->firstColonel << ',' << TeamInfo[t]->firstCommander << ',' << TeamInfo[t]->firstWingman << ','
+            << TeamInfo[t]->lastWingman << ']';
+    }
+    out << "]}";
     out << ",\"valid_aircraft_types\":{\"count\":" << TheCampaign.NumberOfValidTypes << ",\"types\":[";
     for (int i = 0; TheCampaign.ValidAircraftTypes && i < TheCampaign.NumberOfValidTypes && TheCampaign.NumberOfValidTypes < 8888; ++i)
         out << (i ? "," : "") << TheCampaign.ValidAircraftTypes[i];
@@ -729,6 +754,19 @@ void WriteCoreExport(const std::filesystem::path& directory) {
             }
             out << "],\"order\":[" << at(objectiveList, o->Id()) << ',' << at(objectiveGrid, o->Id()) << ',' << at(campList, o->Id())
                 << "],\"emitting\":" << (o->IsEmitting() ? 1 : 0);
+            // The ATC brain's runways: per runway, the feature slots its first header depends on
+            // (CheckHeaderStatus), for NumOperableRunways.
+            if (o->brain) {
+                out << ",\"runways\":[";
+                runwayStatsStruct* rs = o->brain->GetRunwayStats();
+                for (int r = 0; rs && r < o->brain->NumRunways(); ++r) {
+                    const PtHeaderDataType& h = PtHeaderDataTable[rs[r].rwIndexes[0]];
+                    out << (r ? "," : "") << '[';
+                    for (int f = 0; f < MAX_FEAT_DEPEND; ++f) out << (f ? "," : "") << int(h.features[f]);
+                    out << ']';
+                }
+                out << ']';
+            }
             // Terrain radar arcs (CampaignRadarClass), for the radar coverage map: count, then ratios.
             if (o->HasRadarRanges()) {
                 out << ",\"radar_arcs\":[" << o->GetNumberOfArcs();
